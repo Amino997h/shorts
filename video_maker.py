@@ -54,6 +54,29 @@ def download_image(url, save_path):
     except:
         return False
 
+import os
+import json
+import time
+
+def load_config():
+    config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+    default_config = {
+        "api_url": "http://127.0.0.1:8008/v1/chat/completions",
+        "api_key": "sk-chatgpt-local-secret-key",
+        "bot_token": "8951711275:AAFpZH-GfdFxEMO-oCb4iJQz1eBASYGBdCQ",
+        "channel_id": "-1004247712091"
+    }
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                user_config = json.load(f)
+                default_config.update(user_config)
+        except Exception as e:
+            print(f"Error loading config: {e}")
+    return default_config
+
+CONFIG = load_config()
+
 # --- 2. دوال الذكاء الاصطناعي (API المحلي) ---
 def generate_script(topic):
     api_url = CONFIG.get("api_url")
