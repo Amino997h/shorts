@@ -56,8 +56,8 @@ def download_image(url, save_path):
 
 # --- 2. دوال الذكاء الاصطناعي (API المحلي) ---
 def generate_script(topic):
-    api_url = "http://127.0.0.1:8008/v1/chat/completions"
-    api_key = "sk-chatgpt-local-secret-key"
+    api_url = CONFIG.get("api_url")
+    api_key = CONFIG.get("api_key")
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     
     prompt = f"""
@@ -79,8 +79,8 @@ def generate_script(topic):
         return None
 
 def get_image_timings_from_segments(segments):
-    api_url = "http://127.0.0.1:8008/v1/chat/completions"
-    api_key = "sk-chatgpt-local-secret-key"
+    api_url = CONFIG.get("api_url")
+    api_key = CONFIG.get("api_key")
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     
     prompt = f"""
@@ -120,8 +120,8 @@ def get_image_timings_from_segments(segments):
 def upload_to_telegram(video_path, topic):
     print("\n[الخطوة 7]: جاري توليد وصف للفيديو لنشره على تيليجرام...")
     import requests
-    api_url = "http://127.0.0.1:8008/v1/chat/completions"
-    api_key = "sk-chatgpt-local-secret-key"
+    api_url = CONFIG.get("api_url")
+    api_key = CONFIG.get("api_key")
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     
     prompt = f"""
@@ -148,8 +148,8 @@ def upload_to_telegram(video_path, topic):
     print(f"\nالوصف الجاهز:\n{caption}\n")
     print("جاري الرفع إلى قناة التيليجرام (قد يستغرق بعض الوقت حسب حجم الفيديو)...")
     
-    bot_token = "8951711275:AAFpZH-GfdFxEMO-oCb4iJQz1eBASYGBdCQ"
-    channel_id = "-1004247712091"
+    bot_token = CONFIG.get("bot_token")
+    channel_id = CONFIG.get("channel_id")
     
     url = f"https://api.telegram.org/bot{bot_token}/sendVideo"
     
