@@ -52,9 +52,9 @@ def generate_script(topic):
     prompt = f"""
     Write a short voiceover script for a video about the following topic: "{topic}".
     CRITICAL INSTRUCTION:
-    - The script MUST be written in ARABIC language.
+    - The script MUST be written in ENGLISH language. Even if the topic is provided in Arabic, you must write the voiceover script in English.
     - The length of the script must be perfectly suited for a 40 to 60 seconds YouTube Short (approx 60 to 80 words).
-    - Provide ONLY the Arabic text. Do not add any titles, quotes, or markdown formatting. Just the continuous text.
+    - Provide ONLY the English text. Do not add any titles, quotes, or markdown formatting. Just the continuous text.
     """
     
     payload = {"model": "gpt-4o", "messages": [{"role": "user", "content": prompt}], "stream": False}
@@ -126,7 +126,7 @@ def main():
         
     print("\n[الخطوة 2]: تحويل النص إلى صوت احترافي...")
     audio_path = os.path.join(workspace, "voiceover.mp3")
-    tts = gTTS(text=script, lang='ar', slow=False)
+    tts = gTTS(text=script, lang='en', slow=False)
     tts.save(audio_path)
     
     print("\n[الخطوة 3]: استخراج التوقيت الدقيق للكلمات (Faster-Whisper)...")
@@ -134,7 +134,7 @@ def main():
         from faster_whisper import WhisperModel
         # نستخدم موديل صغير للسرعة
         model = WhisperModel("tiny", device="cpu", compute_type="int8")
-        segments_iter, info = model.transcribe(audio_path, language="ar")
+        segments_iter, info = model.transcribe(audio_path, language="en")
         
         segments = []
         for s in segments_iter:
