@@ -180,17 +180,24 @@ def main():
         
     print("\n[الخطوة 6]: المونتاج الدقيق والتصدير...")
     try:
-        from moviepy.editor import ImageClip, concatenate_videoclips, AudioFileClip
+        from moviepy.editor import ImageClip, CompositeVideoClip, AudioFileClip, ColorClip
         
         audio_clip = AudioFileClip(audio_path)
         
-        clips = []
+        # خلفية سوداء بحجم يوتيوب شورت لضمان الأبعاد الزوجية (1080x1920) وتجنب أخطاء المشغلات
+        bg_clip = ColorClip(size=(1080, 1920), color=(0,0,0)).set_duration(audio_clip.duration)
+        
+        clips = [bg_clip]
         for info in downloaded_clips_info:
-            # نعطي الصورة المدة الدقيقة التي حددها الذكاء الاصطناعي
-            clip = ImageClip(info["path"]).set_duration(info["duration"])
+            # تكبير الصورة لتناسب الارتفاع مع الحفاظ على الأبعاد، وتوسيطها
+            clip = (ImageClip(info["path"])
+                    .resize(height=1920)
+                    .set_position("center")
+                    .set_start(info["start"])
+                    .set_duration(info["duration"]))
             clips.append(clip)
             
-        video = concatenate_videoclips(clips, method="compose")
+        video = CompositeVideoClip(clips, size=(1080, 1920))
         video = video.set_audio(audio_clip)
         
         final_video_path = os.path.join(workspace, f"Final_Video.mp4")
