@@ -1,3 +1,4 @@
+# تم التحديث عبر MCP بنجاح
 import os
 import sys
 import json
