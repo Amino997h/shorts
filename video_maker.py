@@ -138,14 +138,22 @@ def main():
         from faster_whisper import WhisperModel
         # نستخدم موديل صغير للسرعة
         model = WhisperModel("tiny", device="cpu", compute_type="int8")
-        segments_iter, info = model.transcribe(audio_path, language="en")
+        segments_iter, info = model.transcribe(audio_path, language="en", word_timestamps=True)
         
-        segments = []
+        words_list = []
         for s in segments_iter:
+            for w in s.words:
+                words_list.append(w)
+                
+        segments = []
+        chunk_size = 5
+        for i in range(0, len(words_list), chunk_size):
+            chunk = words_list[i:i+chunk_size]
+            text = "".join([w.word for w in chunk]).strip()
             segments.append({
-                "start": round(s.start, 2),
-                "end": round(s.end, 2),
-                "text": s.text.strip()
+                "start": round(chunk[0].start, 2),
+                "end": round(chunk[-1].end, 2),
+                "text": text
             })
     except ImportError:
         print("مكتبة faster-whisper غير مثبتة! سيتم التوقف.")
