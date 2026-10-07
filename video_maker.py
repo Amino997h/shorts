@@ -1,5 +1,6 @@
 # تم التحديث عبر MCP بنجاح
 import os
+import argparse
 import sys
 import json
 import urllib.request
@@ -162,13 +163,23 @@ def upload_to_telegram(video_path, topic):
         print(f"خطأ أثناء النشر على تيليجرام: {e}")
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--topic", type=str, default="")
+    args, unknown = parser.parse_known_args()
+
     global_start_time = time.time()
     
     print("\n" + "="*50)
     print("=== 🎬 صانع الفيديوهات الآلي الاحترافي (مع التزامن الدقيق) 🎬 ===")
     print("="*50)
     
-    topic = input("\nما هو موضوع الفيديو؟ (مثال: أسرار الفضاء)\n> ").strip()
+    if args.topic:
+        topic = args.topic.strip()
+        print(f"\nموضوع الفيديو المستلم: {topic}")
+    else:
+        topic = input("\nما هو موضوع الفيديو؟ (مثال: أسرار الفضاء)\n> ").strip()
+        
     if not topic:
         return
         
