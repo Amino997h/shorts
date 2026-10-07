@@ -114,6 +114,53 @@ def get_image_timings_from_segments(segments):
         return None
 
 # --- 3. العملية الأساسية ---
+
+# --- 4. النشر على تيليجرام ---
+def upload_to_telegram(video_path, topic):
+    print("\n[الخطوة 7]: جاري توليد وصف للفيديو لنشره على تيليجرام...")
+    import requests
+    api_url = "http://127.0.0.1:8008/v1/chat/completions"
+    api_key = "sk-chatgpt-local-secret-key"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    
+    prompt = f"""
+    Write a Telegram post for a video about "{topic}".
+    The post must be in Arabic and follow this EXACT structure:
+    Line 1: An attractive title related to the video (with an emoji).
+    Line 2: A short description (first line).
+    Line 3: A short description (second line).
+    Line 4: 5 relevant viral hashtags.
+    
+    Do not add any other lines or text. Just exactly 4 lines.
+    """
+    
+    payload = {"model": "gpt-4o", "messages": [{"role": "user", "content": prompt}], "stream": False}
+    try:
+        response = requests.post(api_url, headers=headers, json=payload)
+        response.raise_for_status()
+        caption = response.json()['choices'][0]['message']['content'].strip()
+    except Exception as e:
+        print(f"خطأ أثناء توليد الوصف: {e}")
+        caption = f"فيديو جديد عن: {topic}\n\n#فيديو #شورت"
+        
+    print(f"\nالوصف الجاهز:\n{caption}\n")
+    print("جاري الرفع إلى قناة التيليجرام (قد يستغرق بعض الوقت حسب حجم الفيديو)...")
+    
+    bot_token = "8951711275:AAFpZH-GfdFxEMO-oCb4iJQz1eBASYGBdCQ"
+    channel_id = "-1004247712091"
+    
+    url = f"https://api.telegram.org/bot{bot_token}/sendVideo"
+    
+    try:
+        with open(video_path, 'rb') as video_file:
+            data = {'chat_id': channel_id, 'caption': caption}
+            files = {'video': video_file}
+            resp = requests.post(url, data=data, files=files, timeout=600)
+            resp.raise_for_status()
+        print("✓ تم النشر على قناة تيليجرام بنجاح!")
+    except Exception as e:
+        print(f"خطأ أثناء النشر على تيليجرام: {e}")
+
 def main():
     global_start_time = time.time()
     
@@ -381,6 +428,9 @@ def main():
         print(f"⏱️ مدة العملية كلها: {total_time} ثانية.")
         print(f"📁 المسار: {final_video_path}")
         print("="*50)
+        
+        # استدعاء دالة تيليجرام
+        upload_to_telegram(final_video_path, topic)
         
         os.startfile(final_video_path)
         
