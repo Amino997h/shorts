@@ -180,22 +180,97 @@ def main():
         
     print("\n[الخطوة 6]: المونتاج الدقيق والتصدير...")
     try:
-        from moviepy.editor import ImageClip, CompositeVideoClip, AudioFileClip, ColorClip
+        from moviepy.editor import ImageClip, CompositeVideoClip, AudioFileClip, VideoFileClip, ColorClip
+        import moviepy.video.fx.all as vfx
+        from PIL import Image, ImageDraw, ImageFont
+        import textwrap
         
         audio_clip = AudioFileClip(audio_path)
         
-        # خلفية سوداء بحجم يوتيوب شورت لضمان الأبعاد الزوجية (1080x1920) وتجنب أخطاء المشغلات
-        bg_clip = ColorClip(size=(1080, 1920), color=(0,0,0)).set_duration(audio_clip.duration)
-        
+        # 1. إعداد فيديو الخلفية الرئيسي
+        bg_video_path = r"C:\Users\User\Downloads\Video Project.mp4"
+        if os.path.exists(bg_video_path):
+            bg_clip = VideoFileClip(bg_video_path)
+            # تكبيره ليملأ الشاشة (1920) وقص الزوائد من المنتصف ليكون العرض 1080
+            bg_clip = bg_clip.resize(height=1920)
+            if bg_clip.w < 1080:
+                bg_clip = bg_clip.resize(width=1080)
+            x_center = bg_clip.w / 2
+            bg_clip = bg_clip.crop(x1=x_center-540, y1=0, x2=x_center+540, y2=1920)
+            
+            # تكرار الخلفية لتناسب مدة الصوت
+            bg_clip = bg_clip.fx(vfx.loop, duration=audio_clip.duration)
+        else:
+            print("تنبيه: فيديو الخلفية غير موجود، سيتم وضع خلفية سوداء.")
+            bg_clip = ColorClip(size=(1080, 1920), color=(0,0,0)).set_duration(audio_clip.duration)
+            
         clips = [bg_clip]
+        
+        # 2. إضافة الصور بحدود دقيقة (Margin Left/Right 100, Top 350, Bottom 250)
+        # المنطقة الآمنة (Safe Zone) عرضها 880 وارتفاعها 1320
         for info in downloaded_clips_info:
-            # تكبير الصورة لتناسب الارتفاع مع الحفاظ على الأبعاد، وتوسيطها
-            clip = (ImageClip(info["path"])
-                    .resize(height=1920)
-                    .set_position("center")
-                    .set_start(info["start"])
-                    .set_duration(info["duration"]))
+            img = ImageClip(info["path"])
+            w_ratio = 880 / img.w
+            h_ratio = 1320 / img.h
+            scale = min(w_ratio, h_ratio)
+            
+            clip = img.resize(scale)
+            # توسيطها في منطقة الـ Safe Zone (التي يبدأ الـ Y الخاص بها من 350)
+            center_y = 350 + (1320 / 2)
+            clip = (clip.set_position(("center", center_y - clip.h / 2))
+                        .set_start(info["start"])
+                        .set_duration(info["duration"]))
             clips.append(clip)
+            
+        # 3. إضافة الترجمة المتزامنة بدقة فوق الصورة (في المساحة العلوية من 0 إلى 350 بكسل)
+        subs_dir = os.path.join(workspace, "subs")
+        os.makedirs(subs_dir, exist_ok=True)
+        
+        try:
+            font = ImageFont.truetype("arialbd.ttf", 60)
+        except:
+            font = ImageFont.load_default()
+            
+        for i, seg in enumerate(segments):
+            text = seg["text"].strip()
+            if not text: continue
+            
+            # إنشاء صورة شفافة للنص
+            img_sub = Image.new('RGBA', (1080, 350), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img_sub)
+            
+            lines = textwrap.wrap(text, width=32)
+            # حساب الارتفاع الإجمالي للنص
+            total_h = 0
+            for line in lines:
+                bbox = draw.textbbox((0, 0), line, font=font)
+                total_h += bbox[3] - bbox[1] + 15
+                
+            current_y = (350 - total_h) / 2
+            for line in lines:
+                bbox = draw.textbbox((0, 0), line, font=font)
+                line_w = bbox[2] - bbox[0]
+                line_h = bbox[3] - bbox[1]
+                x = (1080 - line_w) / 2
+                
+                # كتابة النص بحواف سوداء (Stroke)
+                draw.text((x-3, current_y-3), line, font=font, fill="black")
+                draw.text((x+3, current_y-3), line, font=font, fill="black")
+                draw.text((x-3, current_y+3), line, font=font, fill="black")
+                draw.text((x+3, current_y+3), line, font=font, fill="black")
+                
+                # النص الفعلي باللون الأصفر
+                draw.text((x, current_y), line, font=font, fill="yellow")
+                current_y += line_h + 15
+                
+            sub_path = os.path.join(subs_dir, f"sub_{i}.png")
+            img_sub.save(sub_path)
+            
+            sub_clip = (ImageClip(sub_path)
+                        .set_start(seg["start"])
+                        .set_end(seg["end"])
+                        .set_position(("center", 0)))
+            clips.append(sub_clip)
             
         video = CompositeVideoClip(clips, size=(1080, 1920))
         video = video.set_audio(audio_clip)
