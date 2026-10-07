@@ -46,7 +46,7 @@ def run_video_maker(topic):
     
     try:
         process = subprocess.Popen(
-            ['python', 'video_maker.py', '--topic', topic],
+            ['python', '-u', 'video_maker.py', '--topic', topic],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -55,14 +55,18 @@ def run_video_maker(topic):
         )
         
         for line in iter(process.stdout.readline, ''):
-            line = line.strip()
+            # طباعة السطر في موجه الأوامر (الشاشة السوداء) ليرى المستخدم التفاصيل التقنية
+            sys.stdout.write(line)
+            sys.stdout.flush()
             
-            # فلترة المخرجات لكي تظهر فقط النصوص المفهومة للمستخدم (تجاهل أشرطة التحميل المعقدة)
-            if "[الخطوة" in line or "✓" in line or "خطأ" in line or "الوصف الجاهز" in line or "تم النشر" in line or "--- السكريبت ---" in line:
-                status_text += f"🔹 {line}\\n"
+            line_stripped = line.strip()
+            
+            # فلترة المخرجات لكي تظهر فقط النصوص المفهومة للمستخدم في واجهة الويب
+            if "[الخطوة" in line_stripped or "✓" in line_stripped or "خطأ" in line_stripped or "الوصف الجاهز" in line_stripped or "تم النشر" in line_stripped or "--- السكريبت ---" in line_stripped:
+                status_text += f"🔹 {line_stripped}\\n"
                 yield status_text
-            elif line.startswith("جاري البحث عن:") or "تنبيه" in line:
-                status_text += f"   - {line}\\n"
+            elif line_stripped.startswith("جاري البحث عن:") or "تنبيه" in line_stripped:
+                status_text += f"   - {line_stripped}\\n"
                 yield status_text
                 
         process.stdout.close()
