@@ -1,17 +1,17 @@
 import os
 import sys
-import glob
 import json
 import urllib.request
 import urllib.parse
 import re
 import requests
+import time
 from urllib.error import URLError, HTTPError
 from gtts import gTTS
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-# --- 1. دوال جلب الصور (البحث من Bing) ---
+# --- 1. دوال جلب الصور ---
 def scrape_bing_images(query):
     url = "https://www.bing.com/images/async?q=" + urllib.parse.quote(query) + "&first=1&count=20"
     headers = {
@@ -31,7 +31,7 @@ def scrape_bing_images(query):
 
 def download_image(url, save_path):
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     }
     safe_url = urllib.parse.quote(url, safe=':/&?=#+;@%')
     req = urllib.request.Request(safe_url, headers=headers)
@@ -43,138 +43,167 @@ def download_image(url, save_path):
     except:
         return False
 
-# --- 2. دوال الذكاء الاصطناعي (باستخدام API المحلي الخاص بك) ---
-def generate_script_and_keywords(topic):
-    # نستخدم السيرفر المحلي الخاص بك
+# --- 2. دوال الذكاء الاصطناعي (API المحلي) ---
+def generate_script(topic):
     api_url = "http://127.0.0.1:8008/v1/chat/completions"
     api_key = "sk-chatgpt-local-secret-key"
-    
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     
     prompt = f"""
-    أريد إنشاء فيديو قصير عن الموضوع التالي: "{topic}"
-    الرجاء توفير مخرجاتك في هذا التنسيق بالضبط، بدون أي نص إضافي:
-
-    SCRIPT:
-    [اكتب هنا النص المشوق للفيديو باللغة العربية، يجب أن يكون متصلاً وبدون فواصل أو ترقيم لكي يقرأه المعلق الصوتي بشكل طبيعي ومستمر. 
-    تنبيه هام جداً: يجب أن يكون طول النص مناسباً لفيديو يوتيوب شورت (Shorts) تتراوح مدته بين 40 إلى 60 ثانية بالضبط! (العدد التقريبي للكلمات يجب أن يكون بين 60 إلى 80 كلمة كحد أقصى).]
-
-    IMAGES:
-    [اكتب هنا 5 كلمات مفتاحية قوية للبحث عن صور تناسب النص. يجب أن تكون الكلمات المفتاحية باللغة الإنجليزية لنتائج بحث أدق، ومفصولة بفاصلة. مثال: ancient computer, old floppy disk, modern laptop, server room, artificial intelligence]
+    أريد إنشاء نص فيديو قصير عن الموضوع التالي: "{topic}"
+    تنبيه هام جداً: يجب أن يكون طول النص مناسباً لفيديو يوتيوب شورت (Shorts) تتراوح مدته بين 40 إلى 60 ثانية بالضبط! (العدد التقريبي للكلمات بين 60 إلى 80 كلمة).
+    اكتب النص باللغة العربية، متصلاً، بدون فواصل أو عناوين. فقط النص الذي سيقرأه المعلق الصوتي.
     """
     
-    payload = {
-        "model": "gpt-4o",
-        "messages": [{"role": "user", "content": prompt}],
-        "stream": False
-    }
-    
-    print("\nجاري التفكير وكتابة السكريبت باستخدام السيرفر المحلي الخاص بك...")
+    payload = {"model": "gpt-4o", "messages": [{"role": "user", "content": prompt}], "stream": False}
+    print("\n[الخطوة 1]: جاري التفكير وكتابة السكريبت...")
     try:
         response = requests.post(api_url, headers=headers, json=payload, timeout=60)
         response.raise_for_status()
-        
-        data = response.json()
-        text = data['choices'][0]['message']['content']
-        
-        script_part = text.split("SCRIPT:")[1].split("IMAGES:")[0].strip()
-        images_part = text.split("IMAGES:")[1].strip()
-        keywords = [k.strip() for k in images_part.split(",") if k.strip()]
-        
-        return script_part, keywords
+        return response.json()['choices'][0]['message']['content'].strip()
     except Exception as e:
-        print(f"\nحدث خطأ في الاتصال بالسيرفر المحلي (تأكد من تشغيل Start_ChatGPT_API.bat): {e}")
-        return None, []
+        print(f"خطأ في الاتصال بالسيرفر المحلي: {e}")
+        return None
+
+def get_image_timings_from_segments(segments):
+    api_url = "http://127.0.0.1:8008/v1/chat/completions"
+    api_key = "sk-chatgpt-local-secret-key"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    
+    prompt = f"""
+    إليك النص المفرغ من الفيديو الصوتي مع الثواني الدقيقة لكل مقطع:
+    {json.dumps(segments, ensure_ascii=False, indent=2)}
+    
+    مهمتك هي تحديد الصور المناسبة لتغطية كل هذا الكلام من البداية وحتى نهاية آخر مقطع.
+    أنت من يحدد كم صورة نحتاج، ومتى تبدأ ومتى تنتهي كل صورة بالضبط (يجب أن تغطي كامل وقت الصوت).
+    
+    الرجاء توفير مخرجاتك في شكل JSON فقط، يمثل قائمة (List) من الكائنات، وكل كائن يحتوي على:
+    - "keyword": كلمة مفتاحية بالإنجليزية فقط للبحث عن صورة مناسبة للمقطع.
+    - "start": وقت ظهور الصورة (بالثواني، رقم).
+    - "end": وقت اختفاء الصورة (بالثواني، رقم).
+    
+    لا تكتب أي نص أو شرح نهائياً، فقط مصفوفة JSON الصالحة!
+    """
+    
+    payload = {"model": "gpt-4o", "messages": [{"role": "user", "content": prompt}], "stream": False}
+    print("\n[الخطوة 4]: إرسال التوقيتات للذكاء الاصطناعي لاختيار الصور وتوقيتها الدقيق...")
+    try:
+        response = requests.post(api_url, headers=headers, json=payload, timeout=120)
+        response.raise_for_status()
+        text = response.json()['choices'][0]['message']['content'].strip()
+        
+        if text.startswith("```json"): text = text[7:-3].strip()
+        elif text.startswith("```"): text = text[3:-3].strip()
+            
+        return json.loads(text)
+    except Exception as e:
+        print(f"خطأ أثناء استخراج توقيت الصور: {e}")
+        return None
 
 # --- 3. العملية الأساسية ---
 def main():
+    global_start_time = time.time()
+    
     print("\n" + "="*50)
-    print("=== 🎬 صانع الفيديوهات الآلي بالذكاء الاصطناعي 🎬 ===")
+    print("=== 🎬 صانع الفيديوهات الآلي الاحترافي (مع التزامن الدقيق) 🎬 ===")
     print("="*50)
     
-    topic = input("\nما هو موضوع الفيديو الذي تريد صنعه؟ (مثال: الذكاء الاصطناعي، تاريخ الأندلس...)\n> ").strip()
+    topic = input("\nما هو موضوع الفيديو؟ (مثال: أسرار الفضاء)\n> ").strip()
     if not topic:
         return
         
-    # الخطوة 1: توليد السكريبت
-    script, keywords = generate_script_and_keywords(topic)
-    if not script:
-        return
-        
-    print("\n--- السكريبت الذي تم تأليفه ---")
-    print(script)
-    print("---------------------------------")
+    script = generate_script(topic)
+    if not script: return
     
-    # إعداد مجلد العمل
+    print("\n--- السكريبت ---")
+    print(script)
+    
     workspace = os.path.join(r"C:\Users\User\Documents\antigravity\dazzling-curie", "video_workspace")
-    if not os.path.exists(workspace):
-        os.makedirs(workspace)
+    os.makedirs(workspace, exist_ok=True)
         
-    # الخطوة 2: تحويل النص إلى صوت
     print("\n[الخطوة 2]: تحويل النص إلى صوت احترافي...")
     audio_path = os.path.join(workspace, "voiceover.mp3")
+    tts = gTTS(text=script, lang='ar', slow=False)
+    tts.save(audio_path)
+    
+    print("\n[الخطوة 3]: استخراج التوقيت الدقيق للكلمات (Faster-Whisper)...")
     try:
-        tts = gTTS(text=script, lang='ar', slow=False)
-        tts.save(audio_path)
-        print(f"تم تسجيل الصوت وحفظه بنجاح.")
-    except Exception as e:
-        print(f"فشل في إنشاء الصوت: {e}")
+        from faster_whisper import WhisperModel
+        # نستخدم موديل صغير للسرعة
+        model = WhisperModel("tiny", device="cpu", compute_type="int8")
+        segments_iter, info = model.transcribe(audio_path, language="ar")
+        
+        segments = []
+        for s in segments_iter:
+            segments.append({
+                "start": round(s.start, 2),
+                "end": round(s.end, 2),
+                "text": s.text.strip()
+            })
+    except ImportError:
+        print("مكتبة faster-whisper غير مثبتة! سيتم التوقف.")
         return
+        
+    image_plan = get_image_timings_from_segments(segments)
+    if not image_plan: return
     
-    # الخطوة 3: تحميل الصور
-    print("\n[الخطوة 3]: استخراج الصور المناسبة من الإنترنت...")
-    downloaded_images = []
+    print("\n[الخطوة 5]: تحميل الصور بناءً على التوقيت...")
+    downloaded_clips_info = []
     
-    for i, kw in enumerate(keywords[:5]): # نأخذ أول 5 كلمات مفتاحية
-        print(f"البحث عن: {kw}")
+    for i, plan in enumerate(image_plan):
+        kw = plan['keyword']
+        start_t = plan['start']
+        end_t = plan['end']
+        duration = end_t - start_t
+        
+        print(f"[{start_t}s -> {end_t}s] جاري البحث عن: {kw}")
         urls = scrape_bing_images(kw)
         if urls:
             for url in urls[:5]:
                 img_path = os.path.join(workspace, f"img_{i}.jpg")
                 if download_image(url, img_path):
-                    downloaded_images.append(img_path)
-                    print(f"✓ تم تحميل الصورة {i+1} بنجاح.")
+                    downloaded_clips_info.append({
+                        "path": img_path,
+                        "start": start_t,
+                        "end": end_t,
+                        "duration": duration
+                    })
+                    print(f"✓ تم التحميل.")
                     break
                     
-    if not downloaded_images:
-        print("فشل في تحميل الصور، لا يمكن إكمال المونتاج.")
+    if not downloaded_clips_info:
+        print("فشل تحميل أي صورة.")
         return
         
-    # الخطوة 4: المونتاج
-    print("\n[الخطوة 4]: دمج الصور والصوت لإنتاج الفيديو النهائي...")
+    print("\n[الخطوة 6]: المونتاج الدقيق والتصدير...")
     try:
         from moviepy.editor import ImageClip, concatenate_videoclips, AudioFileClip
         
         audio_clip = AudioFileClip(audio_path)
-        audio_duration = audio_clip.duration
-        
-        duration_per_image = audio_duration / len(downloaded_images)
         
         clips = []
-        for img_path in downloaded_images:
-            clip = ImageClip(img_path).set_duration(duration_per_image)
+        for info in downloaded_clips_info:
+            # نعطي الصورة المدة الدقيقة التي حددها الذكاء الاصطناعي
+            clip = ImageClip(info["path"]).set_duration(info["duration"])
             clips.append(clip)
             
         video = concatenate_videoclips(clips, method="compose")
         video = video.set_audio(audio_clip)
         
         final_video_path = os.path.join(workspace, f"Final_Video.mp4")
-        print("\n⏳ جاري تصدير الفيديو (يرجى الانتظار، قد يستغرق دقيقة)...")
-        
         video.write_videofile(final_video_path, fps=24, codec="libx264", audio_codec="aac", logger=None)
         
+        total_time = round(time.time() - global_start_time, 2)
         print("\n" + "="*50)
-        print(f"🎉 مبرووووك! تم إنتاج الفيديو بنجاح:")
+        print(f"🎉 تم إنتاج الفيديو بتزامن دقيق للصور!")
+        print(f"⏱️ مدة العملية كلها: {total_time} ثانية.")
         print(f"📁 المسار: {final_video_path}")
         print("="*50)
         
         os.startfile(final_video_path)
         
     except Exception as e:
-        print(f"\nحدث خطأ مفاجئ أثناء المونتاج: {e}")
+        print(f"\nخطأ أثناء المونتاج: {e}")
 
 if __name__ == "__main__":
     main()
