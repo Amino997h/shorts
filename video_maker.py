@@ -198,7 +198,7 @@ def main():
         
     print("\n[الخطوة 6]: المونتاج الدقيق والتصدير...")
     try:
-        from moviepy.editor import ImageClip, CompositeVideoClip, AudioFileClip, VideoFileClip, ColorClip
+        from moviepy.editor import ImageClip, CompositeVideoClip, AudioFileClip, VideoFileClip, ColorClip, VideoClip
         import moviepy.video.fx.all as vfx
         from PIL import Image, ImageDraw, ImageFont
         import textwrap
@@ -296,7 +296,23 @@ def main():
             sub_clip = (ImageClip(sub_path)
                         .set_start(seg["start"])
                         .set_end(seg["end"])
-                        .set_position(("center", 0)))
+                        .set_position(("center", 150)))
+            
+            # إضافة تأثير الكتابة (Typewriter / Wipe Effect)
+            def create_wipe_mask(orig_mask, duration):
+                def wipe_frame(t):
+                    w = 1080
+                    progress = min(1.0, t / duration)
+                    x = int(w * progress)
+                    frame = orig_mask.get_frame(t).copy()
+                    if x < w:
+                        frame[:, x:] = 0.0
+                    return frame
+                return VideoClip(wipe_frame, ismask=True, duration=duration)
+                
+            wipe_mask = create_wipe_mask(sub_clip.mask, sub_clip.duration)
+            sub_clip = sub_clip.set_mask(wipe_mask)
+            
             clips.append(sub_clip)
             
         video = CompositeVideoClip(clips, size=(1080, 1920))
