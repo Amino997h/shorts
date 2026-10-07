@@ -38,14 +38,45 @@ def save_config(api_url, api_key, bot_token, channel_id):
 
 def run_video_maker(topic):
     if not topic.strip():
-        return "❌ يرجى إدخال موضوع صالح أولاً!"
+        yield "❌ يرجى إدخال موضوع صالح أولاً!"
+        return
         
-    if os.name == 'nt':
-        subprocess.Popen(['cmd.exe', '/k', 'python', 'video_maker.py', '--topic', topic], creationflags=subprocess.CREATE_NEW_CONSOLE)
-    else:
-        subprocess.Popen(['python', 'video_maker.py', '--topic', topic])
+    status_text = f"🚀 جاري العمل على إنشاء فيديو عن: {topic}\\n" + "="*40 + "\\n\\n"
+    yield status_text
+    
+    try:
+        process = subprocess.Popen(
+            ['python', 'video_maker.py', '--topic', topic],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding='utf-8',
+            errors='replace'
+        )
         
-    return f"✅ تم استلام الطلب!\\n🚀 جاري تشغيل سكريبت الإنتاج لموضوع: {topic}\\nيمكنك متابعة تقدم التحميل والمونتاج في الشاشة السوداء التي ظهرت للتو."
+        for line in iter(process.stdout.readline, ''):
+            line = line.strip()
+            
+            # فلترة المخرجات لكي تظهر فقط النصوص المفهومة للمستخدم (تجاهل أشرطة التحميل المعقدة)
+            if "[الخطوة" in line or "✓" in line or "خطأ" in line or "الوصف الجاهز" in line or "تم النشر" in line or "--- السكريبت ---" in line:
+                status_text += f"🔹 {line}\\n"
+                yield status_text
+            elif line.startswith("جاري البحث عن:") or "تنبيه" in line:
+                status_text += f"   - {line}\\n"
+                yield status_text
+                
+        process.stdout.close()
+        process.wait()
+        
+        if process.returncode == 0:
+            status_text += "\\n🎉 اكتملت المهمة بنجاح! تم حفظ الفيديو ونشره."
+        else:
+            status_text += f"\\n❌ واجه النظام مشكلة وتوقف عن العمل (كود الخطأ: {process.returncode})."
+            
+        yield status_text
+        
+    except Exception as e:
+        yield status_text + f"\\n❌ حدث خطأ غير متوقع: {e}"
 
 css = """
 body {
@@ -70,7 +101,8 @@ with gr.Blocks(title="🎬 صانع الفيديوهات الآلي", theme=gr.t
                 topic_input = gr.Textbox(label="موضوع الفيديو", placeholder="مثال: أسرار الفضاء، الذكاء الاصطناعي، شرح التداول...", scale=4)
             with gr.Row():
                 start_btn = gr.Button("🚀 بدء الإنتاج", variant="primary", size="lg")
-            output_log = gr.Textbox(label="حالة النظام", lines=4, interactive=False)
+            
+            output_log = gr.Textbox(label="شاشة المتابعة الحية 📺", lines=12, interactive=False)
             
             start_btn.click(fn=run_video_maker, inputs=topic_input, outputs=output_log)
 
