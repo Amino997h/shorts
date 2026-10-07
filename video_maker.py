@@ -212,7 +212,16 @@ def main():
         # 2. إضافة الصور بحدود دقيقة (Margin Left/Right 100, Top 350, Bottom 250)
         # المنطقة الآمنة (Safe Zone) عرضها 880 وارتفاعها 1320
         for info in downloaded_clips_info:
-            img = ImageClip(info["path"])
+            img_path = info["path"]
+            
+            # التأكد من أن الصورة بنظام الألوان RGB وتجنب أعطال الأبيض والأسود (Grayscale)
+            from PIL import Image
+            with Image.open(img_path) as pil_img:
+                if pil_img.mode != "RGB":
+                    pil_img = pil_img.convert("RGB")
+                    pil_img.save(img_path)
+                    
+            img = ImageClip(img_path)
             w_ratio = 880 / img.w
             h_ratio = 1320 / img.h
             scale = min(w_ratio, h_ratio)
