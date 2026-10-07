@@ -159,7 +159,8 @@ def main():
             segments.append({
                 "start": round(chunk[0].start, 2),
                 "end": round(chunk[-1].end, 2),
-                "text": text
+                "text": text,
+                "words": [{"word": w.word, "start": w.start, "end": w.end} for w in chunk]
             })
     except ImportError:
         print("مكتبة faster-whisper غير مثبتة! سيتم التوقف.")
@@ -225,7 +226,7 @@ def main():
         clips = [bg_clip]
         
         # 2. إضافة الصور بحدود دقيقة (Margin Left/Right 100, Top 350, Bottom 250)
-        # المنطقة الآمنة (Safe Zone) عرضها 880 وارتفاعها 1320
+        # المنطقة الآمنة عرضها 880 وارتفاعها 1220 (لترك 450 بكسل للنص)
         for info in downloaded_clips_info:
             img_path = info["path"]
             
@@ -238,83 +239,134 @@ def main():
                     
             img = ImageClip(img_path)
             w_ratio = 880 / img.w
-            h_ratio = 1320 / img.h
+            h_ratio = 1220 / img.h
             scale = min(w_ratio, h_ratio)
             
             clip = img.resize(scale)
             # توسيطها في منطقة الـ Safe Zone (التي يبدأ الـ Y الخاص بها من 350)
-            center_y = 350 + (1320 / 2)
+            center_y = 450 + (1220 / 2)
             clip = (clip.set_position(("center", center_y - clip.h / 2))
                         .set_start(info["start"])
                         .set_duration(info["duration"]))
             clips.append(clip)
             
-        # 3. إضافة الترجمة المتزامنة بدقة فوق الصورة (في المساحة العلوية من 0 إلى 350 بكسل)
-        subs_dir = os.path.join(workspace, "subs")
-        os.makedirs(subs_dir, exist_ok=True)
-        
+                # 3. إضافة الترجمة المتزامنة مع تأثير الكتابة الديناميكي
         try:
             font = ImageFont.truetype("arialbd.ttf", 60)
         except:
             font = ImageFont.load_default()
             
+        def get_visible_text(words_list, t):
+            text = ""
+            for w in words_list:
+                if t >= w['end']:
+                    text += w['word']
+                elif t > w['start']:
+                    duration = w['end'] - w['start']
+                    if duration <= 0: duration = 0.001
+                    progress = (t - w['start']) / duration
+                    char_count = int(len(w['word']) * progress)
+                    text += w['word'][:char_count]
+                    break
+                else:
+                    break
+            return text.lstrip()
+            
+        def get_visible_lines(visible_text, full_lines):
+            visible_lines = []
+            remaining = len(visible_text)
+            for line in full_lines:
+                if remaining <= 0:
+                    break
+                if remaining >= len(line):
+                    visible_lines.append(line)
+                    remaining -= len(line) + 1
+                else:
+                    visible_lines.append(line[:remaining])
+                    remaining = 0
+            return visible_lines
+
         for i, seg in enumerate(segments):
             text = seg["text"].strip()
             if not text: continue
+            words = seg.get("words", [])
+            if not words: continue
             
-            # إنشاء صورة شفافة للنص
-            img_sub = Image.new('RGBA', (1080, 350), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(img_sub)
+            full_lines = textwrap.wrap(text, width=32)
             
-            lines = textwrap.wrap(text, width=32)
-            # حساب الارتفاع الإجمالي للنص
             total_h = 0
-            for line in lines:
-                bbox = draw.textbbox((0, 0), line, font=font)
-                total_h += bbox[3] - bbox[1] + 15
-                
-            current_y = (350 - total_h) / 2
-            for line in lines:
-                bbox = draw.textbbox((0, 0), line, font=font)
-                line_w = bbox[2] - bbox[0]
-                line_h = bbox[3] - bbox[1]
-                x = (1080 - line_w) / 2
-                
-                # كتابة النص بحواف سوداء (Stroke)
-                draw.text((x-3, current_y-3), line, font=font, fill="black")
-                draw.text((x+3, current_y-3), line, font=font, fill="black")
-                draw.text((x-3, current_y+3), line, font=font, fill="black")
-                draw.text((x+3, current_y+3), line, font=font, fill="black")
-                
-                # النص الفعلي باللون الأصفر
-                draw.text((x, current_y), line, font=font, fill="yellow")
-                current_y += line_h + 15
-                
-            sub_path = os.path.join(subs_dir, f"sub_{i}.png")
-            img_sub.save(sub_path)
+            line_metrics = []
+            dummy_img = Image.new('RGBA', (1, 1))
+            dummy_draw = ImageDraw.Draw(dummy_img)
+            for line in full_lines:
+                bbox = dummy_draw.textbbox((0, 0), line, font=font)
+                w = bbox[2] - bbox[0]
+                h = bbox[3] - bbox[1]
+                line_metrics.append({'w': w, 'h': h, 'line': line})
+                total_h += h + 15
             
-            sub_clip = (ImageClip(sub_path)
-                        .set_start(seg["start"])
-                        .set_end(seg["end"])
-                        .set_position(("center", 150)))
+            start_y = (450 - total_h) / 2
             
-            # إضافة تأثير الكتابة (Typewriter / Wipe Effect)
-            def create_wipe_mask(orig_mask, duration):
-                def wipe_frame(t):
-                    w = 1080
-                    progress = min(1.0, t / duration)
-                    x = int(w * progress)
-                    frame = orig_mask.get_frame(t).copy()
-                    if x < w:
-                        frame[:, x:] = 0.0
-                    return frame
-                return VideoClip(wipe_frame, ismask=True, duration=duration)
-                
-            wipe_mask = create_wipe_mask(sub_clip.mask, sub_clip.duration)
-            sub_clip = sub_clip.set_mask(wipe_mask)
+            for metric in line_metrics:
+                metric['x'] = (1080 - metric['w']) / 2
+                metric['y'] = start_y
+                start_y += metric['h'] + 15
+
+            class TextClipGenerator:
+                def __init__(self, full_lines, line_metrics, words):
+                    self.full_lines = full_lines
+                    self.line_metrics = line_metrics
+                    self.words = words
+                    self.last_t = -1
+                    self.last_img = None
+                    
+                def generate(self, t):
+                    if t == self.last_t and self.last_img is not None:
+                        return self.last_img
+                        
+                    img_sub = Image.new('RGBA', (1080, 450), (0, 0, 0, 0))
+                    draw = ImageDraw.Draw(img_sub)
+                    current_global_t = t + self.words[0]['start']
+                    
+                    vis_text = get_visible_text(self.words, current_global_t)
+                    vis_lines = get_visible_lines(vis_text, self.full_lines)
+                    
+                    import numpy as np
+                    if not vis_lines:
+                        self.last_img = np.array(img_sub)
+                        self.last_t = t
+                        return self.last_img
+                        
+                    for idx, v_line in enumerate(vis_lines):
+                        if not v_line: continue
+                        x = self.line_metrics[idx]['x']
+                        y = self.line_metrics[idx]['y']
+                        
+                        draw.text((x-3, y-3), v_line, font=font, fill="black")
+                        draw.text((x+3, y-3), v_line, font=font, fill="black")
+                        draw.text((x-3, y+3), v_line, font=font, fill="black")
+                        draw.text((x+3, y+3), v_line, font=font, fill="black")
+                        
+                        draw.text((x, y), v_line, font=font, fill="yellow")
+                    
+                    self.last_img = np.array(img_sub)
+                    self.last_t = t
+                    return self.last_img
+                    
+                def get_rgb(self, t):
+                    return self.generate(t)[:, :, :3]
+                    
+                def get_mask(self, t):
+                    return self.generate(t)[:, :, 3] / 255.0
+
+            gen = TextClipGenerator(full_lines, line_metrics, words)
+            duration = seg["end"] - seg["start"]
             
-            clips.append(sub_clip)
+            txt_clip = VideoClip(gen.get_rgb, duration=duration).set_mask(VideoClip(gen.get_mask, ismask=True, duration=duration))
+            txt_clip = txt_clip.set_start(seg["start"]).set_position(("center", 0))
             
+            clips.append(txt_clip)
+
         video = CompositeVideoClip(clips, size=(1080, 1920))
         video = video.set_audio(audio_clip)
         
