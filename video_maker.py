@@ -276,7 +276,8 @@ def main():
         video = video.set_audio(audio_clip)
         
         final_video_path = os.path.join(workspace, f"Final_Video.mp4")
-        video.write_videofile(final_video_path, fps=24, codec="libx264", audio_codec="aac", logger=None)
+        print("\n⏳ جاري تصدير الفيديو (الرجاء الانتظار، قد يستغرق بعض الوقت بناءً على قوة جهازك)...")
+        video.write_videofile(final_video_path, fps=24, codec="libx264", audio_codec="aac")
         
         total_time = round(time.time() - global_start_time, 2)
         print("\n" + "="*50)
