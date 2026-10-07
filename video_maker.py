@@ -126,13 +126,14 @@ def upload_to_telegram(video_path, topic):
     
     prompt = f"""
     Write a Telegram post for a video about "{topic}".
-    The post must be in Arabic and follow this EXACT structure:
+    The post MUST be written in ENGLISH language (even if the topic is provided in Arabic).
+    Follow this EXACT structure:
     Line 1: An attractive title related to the video (with an emoji).
     Line 2: A short description (first line).
     Line 3: A short description (second line).
     Line 4: 5 relevant viral hashtags.
     
-    Do not add any other lines or text. Just exactly 4 lines.
+    Do not add any other lines or text. Just exactly 4 lines in English.
     """
     
     payload = {"model": "gpt-4o", "messages": [{"role": "user", "content": prompt}], "stream": False}
@@ -142,7 +143,7 @@ def upload_to_telegram(video_path, topic):
         caption = response.json()['choices'][0]['message']['content'].strip()
     except Exception as e:
         print(f"خطأ أثناء توليد الوصف: {e}")
-        caption = f"فيديو جديد عن: {topic}\n\n#فيديو #شورت"
+        caption = f"New video about: {topic}\n\n#video #shorts #viral #trending"
         
     print(f"\nالوصف الجاهز:\n{caption}\n")
     print("جاري الرفع إلى قناة التيليجرام (قد يستغرق بعض الوقت حسب حجم الفيديو)...")
