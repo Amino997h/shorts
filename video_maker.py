@@ -50,9 +50,11 @@ def generate_script(topic):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     
     prompt = f"""
-    أريد إنشاء نص فيديو قصير عن الموضوع التالي: "{topic}"
-    تنبيه هام جداً: يجب أن يكون طول النص مناسباً لفيديو يوتيوب شورت (Shorts) تتراوح مدته بين 40 إلى 60 ثانية بالضبط! (العدد التقريبي للكلمات بين 60 إلى 80 كلمة).
-    اكتب النص باللغة العربية، متصلاً، بدون فواصل أو عناوين. فقط النص الذي سيقرأه المعلق الصوتي.
+    Write a short voiceover script for a video about the following topic: "{topic}".
+    CRITICAL INSTRUCTION:
+    - The script MUST be written in ARABIC language.
+    - The length of the script must be perfectly suited for a 40 to 60 seconds YouTube Short (approx 60 to 80 words).
+    - Provide ONLY the Arabic text. Do not add any titles, quotes, or markdown formatting. Just the continuous text.
     """
     
     payload = {"model": "gpt-4o", "messages": [{"role": "user", "content": prompt}], "stream": False}
@@ -71,18 +73,19 @@ def get_image_timings_from_segments(segments):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     
     prompt = f"""
-    إليك النص المفرغ من الفيديو الصوتي مع الثواني الدقيقة لكل مقطع:
+    Below is the transcribed audio of a video with exact timestamps for each segment:
     {json.dumps(segments, ensure_ascii=False, indent=2)}
     
-    مهمتك هي تحديد الصور المناسبة لتغطية كل هذا الكلام من البداية وحتى نهاية آخر مقطع.
-    أنت من يحدد كم صورة نحتاج، ومتى تبدأ ومتى تنتهي كل صورة بالضبط (يجب أن تغطي كامل وقت الصوت).
+    Your task is to assign relevant images to cover the entire duration of the audio from start to finish.
+    You decide how many images are needed, and the exact start and end time for each image based on the spoken text.
     
-    الرجاء توفير مخرجاتك في شكل JSON فقط، يمثل قائمة (List) من الكائنات، وكل كائن يحتوي على:
-    - "keyword": كلمة مفتاحية بالإنجليزية فقط للبحث عن صورة مناسبة للمقطع.
-    - "start": وقت ظهور الصورة (بالثواني، رقم).
-    - "end": وقت اختفاء الصورة (بالثواني، رقم).
-    
-    لا تكتب أي نص أو شرح نهائياً، فقط مصفوفة JSON الصالحة!
+    CRITICAL INSTRUCTIONS:
+    - Respond ONLY with a valid JSON array of objects. Do not write any explanations or conversational text.
+    - Everything in your response MUST be in English.
+    - Each object must have:
+      * "keyword": A strong, descriptive search keyword in English to find a matching image for this segment.
+      * "start": The exact start time in seconds (float).
+      * "end": The exact end time in seconds (float).
     """
     
     payload = {"model": "gpt-4o", "messages": [{"role": "user", "content": prompt}], "stream": False}
