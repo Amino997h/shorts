@@ -10,6 +10,9 @@ from urllib.error import URLError, HTTPError
 from gtts import gTTS
 
 sys.stdout.reconfigure(encoding='utf-8')
+from PIL import Image
+if not hasattr(Image, 'ANTIALIAS'):
+    Image.ANTIALIAS = Image.Resampling.LANCZOS
 
 # --- 1. دوال جلب الصور ---
 def scrape_bing_images(query):
