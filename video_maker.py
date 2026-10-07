@@ -43,6 +43,12 @@ def download_image(url, save_path):
         with urllib.request.urlopen(req, timeout=10) as response:
             with open(save_path, 'wb') as f:
                 f.write(response.read())
+                
+        # التحقق من أن الملف المحمل هو صورة صالحة وليس تالفاً
+        from PIL import Image
+        with Image.open(save_path) as img:
+            img.verify()
+            
         return True
     except:
         return False
