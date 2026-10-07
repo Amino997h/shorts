@@ -165,8 +165,9 @@ def main():
     except ImportError:
         print("مكتبة faster-whisper غير مثبتة! سيتم التوقف.")
         return
-        
-    image_plan = get_image_timings_from_segments(segments)
+    print("\n[الخطوة 4]: إرسال التوقيتات للذكاء الاصطناعي لاختيار الصور وتوقيتها الدقيق...")
+    lite_segments = [{"start": s["start"], "end": s["end"], "text": s["text"]} for s in segments]
+    image_plan = get_image_timings_from_segments(lite_segments)
     if not image_plan: return
     
     print("\n[الخطوة 5]: تحميل الصور بناءً على التوقيت...")
