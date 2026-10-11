@@ -198,14 +198,21 @@ def upload_to_telegram(video_path, topic):
     
     payload = {"model": "gpt-4o", "messages": [{"role": "user", "content": prompt}], "stream": False}
     try:
-        response = requests.post(api_url, headers=headers, json=payload)
+        response = requests.post(api_url, headers=headers, json=payload, timeout=30)
         response.raise_for_status()
-        caption = response.json()['choices'][0]['message']['content'].strip()
+        raw_caption = response.json()['choices'][0]['message']['content'].strip()
+        
+        # حماية صارمة: التأكد من أن الوصف لا يتجاوز حد تيليجرام ولا يحتوي على مخرجات الشاشة
+        if len(raw_caption) > 800 or any(bad_word in raw_caption for bad_word in ["الخطوة", "Whisper", "جاري", "Building video", "MoviePy"]):
+            print("⚠️ الوصف المستلم من السيرفر غير صالح للنشر، استخدام القالب المعتمد المباشر.")
+            caption = f"🔥 The Untold Story of {topic}\n\nDiscover the incredible facts you never knew about {topic}!\nWatch till the end to see the full story.\n\n#history #shorts #viral #trending #facts"
+        else:
+            caption = raw_caption
     except Exception as e:
         print(f"خطأ أثناء توليد الوصف: {e}")
-        caption = f"New video about: {topic}\n\n#video #shorts #viral #trending"
+        caption = f"🔥 The Untold Story of {topic}\n\nDiscover the incredible facts you never knew about {topic}!\nWatch till the end to see the full story.\n\n#history #shorts #viral #trending #facts"
         
-    print(f"\nالوصف الجاهز:\n{caption}\n")
+    caption = caption[:1000] # ضمان عدم تجاوز حد تيليجرام الصارم (1024 حرف)
     print("جاري الرفع إلى قناة التيليجرام (قد يستغرق بعض الوقت حسب حجم الفيديو)...")
     
     bot_token = CONFIG.get("bot_token")
