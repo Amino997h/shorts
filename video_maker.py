@@ -1,5 +1,6 @@
 # تم التحديث عبر MCP بنجاح
 import os
+import subprocess
 import argparse
 import sys
 import json
@@ -658,7 +659,6 @@ def main():
         if os.path.exists(outro_path):
             print("\n🎬 [الخاتمة]: جاري إزالة صمت النهاية ودمج فيديو الاشتراك في نهاية المقطع...")
             temp_with_outro = os.path.join(workspace, "temp_final_outro.mp4")
-            import subprocess
             
             # معرفة لحظة انتهاء الكلام بدقة لقطع الصمت الميت
             cut_time = speech_end_time if (speech_end_time and speech_end_time < audio_clip.duration) else None
