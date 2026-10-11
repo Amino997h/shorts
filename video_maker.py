@@ -690,50 +690,108 @@ def main():
         except:
             pass
 
-        # --- دمج الخاتمة التلقائي وقص الصمت النهائي بعد اكتمال البرنامج الأصلي بالكامل ---
+        # --- دمج الهوك البصري الافتتاحي والخاتمة التلقائية وقص الصمت النهائي ---
+        hook_dir = r"C:\Users\User\OneDrive\Desktop\resilt\hook"
         outro_path = r"C:\Users\User\OneDrive\Desktop\resilt\6993530118_tk_2x.mp4"
-        if os.path.exists(outro_path):
-            print("\n🎬 [الخاتمة]: جاري إزالة صمت النهاية ودمج فيديو الاشتراك في نهاية المقطع...")
-            temp_with_outro = os.path.join(workspace, "temp_final_outro.mp4")
+        
+        temp_hook_path = None
+        if os.path.exists(hook_dir):
+            hook_files = [os.path.join(hook_dir, f) for f in os.listdir(hook_dir) if f.lower().endswith(('.mp4', '.mov', '.mkv'))]
+            if hook_files:
+                selected_hook = random.choice(hook_files)
+                hook_name = os.path.basename(selected_hook)
+                print(f"\n🎯 [الهوك البصري]: تم اختيار هوك عشوائي ({hook_name}) للبداية...")
+                try:
+                    probe_cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", selected_hook]
+                    res = subprocess.run(probe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    hook_dur = float(res.stdout.strip())
+                    active_dur = max(0.15, hook_dur - 0.20)
+                    
+                    temp_hook_file = os.path.join(workspace, "temp_prepared_hook.mp4")
+                    # اقتطاع 0.2 ثانية من نهاية الهوك وتحويلها لشاشة سوداء صامتة مع تقليل صوت الهوك (volume=0.6)
+                    hook_prep_cmd = [
+                        "ffmpeg", "-y", "-loglevel", "error",
+                        "-i", selected_hook,
+                        "-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=24:d=0.2",
+                        "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo:d=0.2",
+                        "-filter_complex",
+                        f"[0:v]trim=0:{active_dur:.2f},setpts=PTS-STARTPTS,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=24[v0];"
+                        f"[0:a]atrim=0:{active_dur:.2f},asetpts=PTS-STARTPTS,volume=0.6,aresample=44100,aformat=channel_layouts=stereo[a0];"
+                        f"[1:v]setsar=1,fps=24[v_b];"
+                        f"[2:a]aresample=44100,aformat=channel_layouts=stereo[a_b];"
+                        f"[v0][a0][v_b][a_b]concat=n=2:v=1:a=1[v][a]",
+                        "-map", "[v]", "-map", "[a]",
+                        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
+                        "-c:a", "aac", "-b:a", "192k",
+                        temp_hook_file
+                    ]
+                    subprocess.run(hook_prep_cmd, check=True)
+                    temp_hook_path = temp_hook_file
+                    print("   ✓ تم تجهيز الهوك البصري مع شاشة التعتيم وخفض الصوت بنجاح!")
+                except Exception as e_hk:
+                    print(f"   ⚠️ تعذر تجهيز الهوك البصري ({e_hk})، سيتم تجاوزه.")
+
+        # تجميع الأجزاء (الهوك + الفيديو الأساسي + الخاتمة)
+        has_outro = os.path.exists(outro_path)
+        cut_time = speech_end_time if (speech_end_time and speech_end_time < audio_clip.duration) else None
+        
+        if temp_hook_path or has_outro:
+            print("\n🎬 [المونتاج النهائي]: جاري دمج الأجزاء وقص الصمت الميت...")
+            temp_stitched = os.path.join(workspace, "temp_final_stitched.mp4")
+            inputs = []
+            filter_parts = []
+            v_maps = []
+            a_maps = []
+            input_idx = 0
             
-            # معرفة لحظة انتهاء الكلام بدقة لقطع الصمت الميت
-            cut_time = speech_end_time if (speech_end_time and speech_end_time < audio_clip.duration) else None
-            
+            # 1. إضافة الهوك إن وجد
+            if temp_hook_path:
+                inputs.extend(["-i", temp_hook_path])
+                filter_parts.append(f"[{input_idx}:v]scale=1080:1920,setsar=1,fps=24[v_hk]; [{input_idx}:a]aresample=44100,aformat=channel_layouts=stereo[a_hk];")
+                v_maps.append("[v_hk]")
+                a_maps.append("[a_hk]")
+                input_idx += 1
+                
+            # 2. إضافة الفيديو الأساسي (مع قص الصمت الميت إن وجد)
+            inputs.extend(["-i", final_video_path])
             if cut_time:
                 silence_gap = round(audio_clip.duration - cut_time, 2)
-                print(f"   ✂️ تم رصد {silence_gap} ثانية صمت ميت بعد انتهاء الكلام — قطع فوري وانتقال للخاتمة!")
-                filter_complex = (
-                    f"[0:v]trim=0:{cut_time:.2f},setpts=PTS-STARTPTS,fps=24[v0];"
-                    f"[0:a]atrim=0:{cut_time:.2f},asetpts=PTS-STARTPTS,aresample=44100,aformat=channel_layouts=stereo[a0];"
-                    f"[1:v]scale=1080:1920,setsar=1,fps=24[v1];"
-                    f"[1:a]aresample=44100,aformat=channel_layouts=stereo[a1];"
-                    f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]"
-                )
+                print(f"   ✂️ تم رصد {silence_gap} ثانية صمت ميت بعد انتهاء الكلام — قطع فوري!")
+                filter_parts.append(f"[{input_idx}:v]trim=0:{cut_time:.2f},setpts=PTS-STARTPTS,scale=1080:1920,setsar=1,fps=24[v_main]; [{input_idx}:a]atrim=0:{cut_time:.2f},asetpts=PTS-STARTPTS,aresample=44100,aformat=channel_layouts=stereo[a_main];")
             else:
-                filter_complex = (
-                    "[0:v]scale=1080:1920,setsar=1,fps=24[v0];"
-                    "[0:a]aresample=44100,aformat=channel_layouts=stereo[a0];"
-                    "[1:v]scale=1080:1920,setsar=1,fps=24[v1];"
-                    "[1:a]aresample=44100,aformat=channel_layouts=stereo[a1];"
-                    "[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]"
-                )
-
+                filter_parts.append(f"[{input_idx}:v]scale=1080:1920,setsar=1,fps=24[v_main]; [{input_idx}:a]aresample=44100,aformat=channel_layouts=stereo[a_main];")
+            v_maps.append("[v_main]")
+            a_maps.append("[a_main]")
+            input_idx += 1
+            
+            # 3. إضافة الخاتمة إن وجدت
+            if has_outro:
+                inputs.extend(["-i", outro_path])
+                filter_parts.append(f"[{input_idx}:v]scale=1080:1920,setsar=1,fps=24[v_out]; [{input_idx}:a]aresample=44100,aformat=channel_layouts=stereo[a_out];")
+                v_maps.append("[v_out]")
+                a_maps.append("[a_out]")
+                input_idx += 1
+                
+            total_segments = len(v_maps)
+            concat_inputs = "".join(f"{v_maps[i]}{a_maps[i]}" for i in range(total_segments))
+            filter_parts.append(f"{concat_inputs}concat=n={total_segments}:v=1:a=1[v][a]")
+            
+            full_filter_complex = " ".join(filter_parts)
+            stitch_cmd = [
+                "ffmpeg", "-y", "-loglevel", "error"
+            ] + inputs + [
+                "-filter_complex", full_filter_complex,
+                "-map", "[v]", "-map", "[a]",
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22",
+                "-c:a", "aac", "-b:a", "192k",
+                temp_stitched
+            ]
             try:
-                cmd = [
-                    "ffmpeg", "-y", "-loglevel", "error",
-                    "-i", final_video_path,
-                    "-i", outro_path,
-                    "-filter_complex", filter_complex,
-                    "-map", "[v]", "-map", "[a]",
-                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22",
-                    "-c:a", "aac", "-b:a", "192k",
-                    temp_with_outro
-                ]
-                subprocess.run(cmd, check=True)
-                os.replace(temp_with_outro, final_video_path)
-                print("✓ تم دمج خاتمة الاشتراك بنجاح وانتقال فوري بدون أي صمت!")
-            except Exception as e_outro:
-                print(f"⚠️ تعذر دمج الخاتمة ({e_outro})، سيتم استخدام الفيديو الأصلي.")
+                subprocess.run(stitch_cmd, check=True)
+                os.replace(temp_stitched, final_video_path)
+                print("✓ تم تجميع الهوك الافتتاحي والفيديو وخاتمة الاشتراك بنجاح تام!")
+            except Exception as e_stitch:
+                print(f"⚠️ تعذر التجميع النهائي ({e_stitch})، سيتم استخدام الفيديو الأصلي.")
         
         total_time = round(time.time() - global_start_time, 2)
         print("\n" + "="*50)

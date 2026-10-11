@@ -157,7 +157,7 @@ def execute_topic(topic, current_num, total_num, prefix=""):
             
             line_stripped = line.strip()
             
-            if "[الخطوة" in line_stripped or "✓" in line_stripped or "خطأ" in line_stripped or "الوصف الجاهز" in line_stripped or "تم النشر" in line_stripped or "--- السكريبت ---" in line_stripped or "الخاتمة" in line_stripped or "قص الصمت" in line_stripped or "✂️" in line_stripped or "🎵" in line_stripped or "🎮" in line_stripped:
+            if "[الخطوة" in line_stripped or "✓" in line_stripped or "خطأ" in line_stripped or "الوصف الجاهز" in line_stripped or "تم النشر" in line_stripped or "--- السكريبت ---" in line_stripped or "الخاتمة" in line_stripped or "قص الصمت" in line_stripped or "✂️" in line_stripped or "🎵" in line_stripped or "🎮" in line_stripped or "🎯" in line_stripped:
                 status_text += f"🔹 {line_stripped}\\n"
                 yield status_text
             elif line_stripped.startswith("جاري البحث عن:") or "تنبيه" in line_stripped:
