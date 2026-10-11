@@ -177,24 +177,38 @@ def get_image_timings_from_segments(segments):
 # --- 3. العملية الأساسية ---
 
 # --- 4. النشر على تيليجرام ---
-def upload_to_telegram(video_path, topic):
-    print("\n[الخطوة 7]: جاري توليد وصف للفيديو لنشره على تيليجرام...")
+def upload_to_telegram(video_path, topic, script=""):
+    print("\n[الخطوة 7]: جاري توليد عنوان ووصف فيروسي متوافق مع الخوارزميات (YouTube Shorts & Telegram)...")
     import requests
     api_url = CONFIG.get("api_url")
     api_key = CONFIG.get("api_key")
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     
-    prompt = f"""
-    Write a Telegram post for a video about "{topic}".
-    The post MUST be written in ENGLISH language (even if the topic is provided in Arabic).
-    Follow this EXACT structure:
-    Line 1: An attractive title related to the video (with an emoji).
-    Line 2: A short description (first line).
-    Line 3: A short description (second line).
-    Line 4: 5 relevant viral hashtags.
+    script_context = f"\nVideo Script:\n{script}\n" if script else ""
     
-    Do not add any other lines or text. Just exactly 4 lines in English.
+    prompt = f"""
+    You are a viral YouTube Shorts and TikTok content strategist.
+    Write an irresistible, high-CTR metadata package for this video topic: "{topic}".{script_context}
+    
+    CRITICAL REQUIREMENTS:
+    - Everything MUST be written in ENGLISH language.
+    - Structure EXACTLY in 4 lines:
+      Line 1 (ATTRACTIVE TITLE): A viral, curiosity-driven title with 1-2 relevant emojis (e.g. "😱 Why Trees Are Rarer Than Diamonds in Space! 💎").
+      Line 2 (HOOK DESCRIPTION): One fascinating, curiosity-inducing sentence revealing the core mind-blowing truth from the video.
+      Line 3 (CALL TO ACTION): A short, engaging question prompting comments (e.g. "Did you know this? Let us know what you think below! 👇").
+      Line 4 (VIRAL HASHTAGS): Exactly 6 high-traffic, algorithm-friendly hashtags matching the topic (e.g. #Shorts #DidYouKnow #Viral #Facts #ScienceFacts #MindBlowing).
+      
+    - Output ONLY the 4 lines. Do NOT write labels like "Line 1:", brackets, or conversational preamble.
     """
+    
+    def generate_smart_fallback(t):
+        clean_t = t.strip().title()
+        return (
+            f"🤯 The Mind-Blowing Truth About {clean_t}! 🚀\n"
+            f"Discover the unbelievable facts you never knew about {clean_t}!\n"
+            f"Did you know this? Share your thoughts in the comments! 👇\n"
+            f"#Shorts #DidYouKnow #Viral #Facts #Trending #MindBlowing"
+        )
     
     payload = {"model": "gpt-4o", "messages": [{"role": "user", "content": prompt}], "stream": False}
     try:
@@ -204,13 +218,13 @@ def upload_to_telegram(video_path, topic):
         
         # حماية صارمة: التأكد من أن الوصف لا يتجاوز حد تيليجرام ولا يحتوي على مخرجات الشاشة
         if len(raw_caption) > 800 or any(bad_word in raw_caption for bad_word in ["الخطوة", "Whisper", "جاري", "Building video", "MoviePy"]):
-            print("⚠️ الوصف المستلم من السيرفر غير صالح للنشر، استخدام القالب المعتمد المباشر.")
-            caption = f"🔥 The Untold Story of {topic}\n\nDiscover the incredible facts you never knew about {topic}!\nWatch till the end to see the full story.\n\n#history #shorts #viral #trending #facts"
+            print("⚠️ الوصف المستلم من السيرفر غير ملائم، استخدام القالب الفيروسي المعتمد.")
+            caption = generate_smart_fallback(topic)
         else:
             caption = raw_caption
     except Exception as e:
         print(f"خطأ أثناء توليد الوصف: {e}")
-        caption = f"🔥 The Untold Story of {topic}\n\nDiscover the incredible facts you never knew about {topic}!\nWatch till the end to see the full story.\n\n#history #shorts #viral #trending #facts"
+        caption = generate_smart_fallback(topic)
         
     caption = caption[:1000] # ضمان عدم تجاوز حد تيليجرام الصارم (1024 حرف)
     print("جاري الرفع إلى قناة التيليجرام (قد يستغرق بعض الوقت حسب حجم الفيديو)...")
@@ -466,10 +480,21 @@ def main():
                         resample=Image.Resampling.BICUBIC
                     )
                     
-                    # 5. التوسيط في شريط الترجمة العلوي (1080x450)
+                    # 5. الحماية الصارمة من تجاوز حدود الشاشة وترك هوامش أمان (Safe Margin Auto-Scaler)
+                    MAX_SAFE_WIDTH = 860  # يضمن ترك هامش أمان لا يقل عن 110 بكسل من كل جانب
+                    if sheared.width > MAX_SAFE_WIDTH:
+                        scale_factor = MAX_SAFE_WIDTH / sheared.width
+                        final_w = int(sheared.width * scale_factor)
+                        final_h = int(self.box_h * scale_factor)
+                        sheared = sheared.resize((final_w, final_h), Image.Resampling.LANCZOS)
+                    else:
+                        final_w = sheared.width
+                        final_h = self.box_h
+                    
+                    # 6. التوسيط في شريط الترجمة العلوي (1080x450)
                     canvas = Image.new('RGBA', (1080, 450), (0, 0, 0, 0))
-                    pos_x = (1080 - sheared.width) // 2
-                    pos_y = (450 - self.box_h) // 2
+                    pos_x = (1080 - final_w) // 2
+                    pos_y = (450 - final_h) // 2
                     canvas.paste(sheared, (pos_x, pos_y), sheared)
                     
                     import numpy as np
@@ -527,7 +552,7 @@ def main():
         print("="*50)
         
         # استدعاء دالة تيليجرام
-        upload_to_telegram(final_video_path, topic)
+        upload_to_telegram(final_video_path, topic, script)
         
         os.startfile(final_video_path)
         
