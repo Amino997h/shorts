@@ -64,7 +64,8 @@ def load_config():
         "api_url": "http://127.0.0.1:8008/v1/chat/completions",
         "api_key": "sk-chatgpt-local-secret-key",
         "bot_token": "8951711275:AAFpZH-GfdFxEMO-oCb4iJQz1eBASYGBdCQ",
-        "channel_id": "-1004247712091"
+        "channel_id": "-1004247712091",
+        "voice": "en-US-GuyNeural - en-US (Male)"
     }
     if os.path.exists(config_path):
         try:
@@ -76,6 +77,34 @@ def load_config():
     return default_config
 
 CONFIG = load_config()
+
+def generate_voice(text, output_path):
+    voice = CONFIG.get("voice", "en-US-GuyNeural - en-US (Male)")
+    print(f"   🎙️ جاري توليد الصوت الواقعي الطبيعي ({voice})...")
+    try:
+        from gradio_client import Client
+        import shutil
+        client = Client("innoai/Edge-TTS-Text-to-Speech", verbose=False)
+        result = client.predict(
+            text,
+            voice,
+            0, # rate
+            0, # pitch
+            api_name="/tts_interface"
+        )
+        temp_audio = result[0]
+        shutil.copy(temp_audio, output_path)
+        print("   ✓ تم توليد الصوت العصبي فائق الجودة بنجاح!")
+        return True
+    except Exception as e:
+        print(f"   ⚠️ تعذر الاتصال بمحرك الصوت العصبي ({e})، جاري التراجع إلى الصوت البديل...")
+        try:
+            tts = gTTS(text=text, lang='en', slow=False)
+            tts.save(output_path)
+            return True
+        except Exception as e2:
+            print(f"خطأ أثناء توليد الصوت: {e2}")
+            return False
 
 # --- 2. دوال الذكاء الاصطناعي (API المحلي) ---
 def generate_script(topic):
@@ -218,8 +247,9 @@ def main():
         
     print("\n[الخطوة 2]: تحويل النص إلى صوت احترافي...")
     audio_path = os.path.join(workspace, "voiceover.mp3")
-    tts = gTTS(text=script, lang='en', slow=False)
-    tts.save(audio_path)
+    if not generate_voice(script, audio_path):
+        print("فشل توليد الصوت! سيتم التوقف.")
+        return
     
     print("\n[الخطوة 3]: استخراج التوقيت الدقيق للكلمات (Faster-Whisper)...")
     try:
@@ -474,3 +504,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# MCP Sync Check

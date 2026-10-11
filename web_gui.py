@@ -13,7 +13,8 @@ def load_config():
         "api_url": "http://127.0.0.1:8008/v1/chat/completions",
         "api_key": "sk-chatgpt-local-secret-key",
         "bot_token": "8951711275:AAFpZH-GfdFxEMO-oCb4iJQz1eBASYGBdCQ",
-        "channel_id": "-1004247712091"
+        "channel_id": "-1004247712091",
+        "voice": "en-US-GuyNeural - en-US (Male)"
     }
     if os.path.exists(CONFIG_FILE):
         try:
@@ -24,12 +25,13 @@ def load_config():
             pass
     return default_config
 
-def save_config(api_url, api_key, bot_token, channel_id):
+def save_config(api_url, api_key, bot_token, channel_id, voice):
     config = {
         "api_url": api_url.strip(),
         "api_key": api_key.strip(),
         "bot_token": bot_token.strip(),
-        "channel_id": channel_id.strip()
+        "channel_id": channel_id.strip(),
+        "voice": voice.strip()
     }
     try:
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
@@ -218,7 +220,23 @@ with gr.Blocks(title="🎬 صانع الفيديوهات الآلي", theme=gr.t
             demo.load(fn=check_resume_status, outputs=resume_alert)
             demo.load(fn=lambda: gr.update(visible=True) if load_state().get("in_progress") else gr.update(visible=False), outputs=resume_btn)
 
-        with gr.TabItem("⚙️ الإعدادات (API & Telegram)"):
+        with gr.TabItem("⚙️ الإعدادات (الصوت، API، تيليجرام)"):
+            with gr.Group():
+                voice_choices = [
+                    "en-US-GuyNeural - en-US (Male)",
+                    "en-US-ChristopherNeural - en-US (Male)",
+                    "en-US-JennyNeural - en-US (Female)",
+                    "en-US-BrianMultilingualNeural - en-US (Male)",
+                    "en-US-AriaNeural - en-US (Female)"
+                ]
+                current_voice = current_config.get("voice", "en-US-GuyNeural - en-US (Male)")
+                if current_voice not in voice_choices:
+                    voice_choices.insert(0, current_voice)
+                voice_input = gr.Dropdown(
+                    label="🎙️ صوت الراوي بالذكاء الاصطناعي (Neural AI Voice)",
+                    choices=voice_choices,
+                    value=current_voice
+                )
             with gr.Group():
                 api_url_input = gr.Textbox(label="رابط الـ API", value=current_config["api_url"])
                 api_key_input = gr.Textbox(label="مفتاح الـ API Key", value=current_config["api_key"], type="password")
@@ -228,7 +246,9 @@ with gr.Blocks(title="🎬 صانع الفيديوهات الآلي", theme=gr.t
                 
             save_btn = gr.Button("💾 حفظ الإعدادات", variant="secondary")
             save_status = gr.Markdown("")
-            save_btn.click(fn=save_config, inputs=[api_url_input, api_key_input, bot_token_input, channel_id_input], outputs=save_status)
+            save_btn.click(fn=save_config, inputs=[api_url_input, api_key_input, bot_token_input, channel_id_input, voice_input], outputs=save_status)
 
 if __name__ == "__main__":
     demo.launch(inbrowser=True, server_name="127.0.0.1", server_port=7860)
+
+# MCP Sync Check
