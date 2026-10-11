@@ -124,7 +124,7 @@ def generate_script(topic):
        - Fast-paced, punchy, engaging narrative that quickly rewards the curiosity created by the hook.
     3. LANGUAGE & FORMAT:
        - The script MUST be written in ENGLISH (even if the topic is provided in Arabic).
-       - Total length: exactly 65 to 85 words (perfect for a 45-60 second Short).
+       - Total length: exactly 85 to 105 words (rich, high-retention narrative, about 5 seconds longer than standard).
        - Output ONLY the spoken voiceover script text with no titles, quotes, brackets, or markdown formatting.
     """
     
@@ -261,6 +261,31 @@ def upload_to_telegram(video_path, topic, script=""):
     except Exception as e:
         print(f"خطأ أثناء النشر على تيليجرام: {e}")
 
+def compress_speech_pauses(audio_path, factor=0.30, min_silence_len=250, silence_thresh=-35):
+    """تقليص الفراغات الصامتة بين الجمل إلى 30% من المدة الأصلية لتسريع وتيرة الكلام دون تسريع الكلمات نفسها."""
+    try:
+        from pydub import AudioSegment
+        from pydub.silence import detect_silence
+        audio = AudioSegment.from_file(audio_path)
+        silences = detect_silence(audio, min_silence_len=min_silence_len, silence_thresh=silence_thresh)
+        if not silences:
+            return
+        new_audio = AudioSegment.empty()
+        last_end = 0
+        for s_start, s_end in silences:
+            new_audio += audio[last_end:s_start]
+            dur = s_end - s_start
+            kept_len = max(90, int(dur * factor))
+            new_audio += audio[s_start : s_start + kept_len]
+            last_end = s_end
+        new_audio += audio[last_end:]
+        old_sec = round(len(audio)/1000, 1)
+        new_sec = round(len(new_audio)/1000, 1)
+        print(f"   ✂️ تم تقليص فترات الصمت بين الجمل إلى 30% من الأصل بنجاح ({old_sec}s ➔ {new_sec}s)!")
+        new_audio.export(audio_path, format="mp3")
+    except Exception as e:
+        print(f"   ⚠️ تعذر تقليص الصمت بين الجمل ({e})، سيتم استخدام الصوت الأصلي.")
+
 def main():
     import argparse
     parser = argparse.ArgumentParser()
@@ -296,6 +321,9 @@ def main():
     if not generate_voice(script, audio_path):
         print("فشل توليد الصوت! سيتم التوقف.")
         return
+
+    # تقليص الفراغ في الكلام بين الجمل لحوالي 30% من الأصلي
+    compress_speech_pauses(audio_path, factor=0.30)
     
     print("\n[الخطوة 3]: استخراج التوقيت الدقيق للكلمات (Faster-Whisper)...")
     speech_end_time = None
@@ -374,7 +402,7 @@ def main():
         
     print("\n[الخطوة 6]: المونتاج الدقيق والتصدير...")
     try:
-        from moviepy.editor import ImageClip, CompositeVideoClip, AudioFileClip, VideoFileClip, ColorClip, VideoClip
+        from moviepy.editor import ImageClip, CompositeVideoClip, AudioFileClip, VideoFileClip, ColorClip, VideoClip, CompositeAudioClip
         import moviepy.video.fx.all as vfx
         from PIL import Image, ImageDraw, ImageFont
         import textwrap
@@ -557,9 +585,35 @@ def main():
             clips.append(txt_clip)
 
         video = CompositeVideoClip(clips, size=(1080, 1920))
-        video = video.set_audio(audio_clip)
         
-        final_video_path = os.path.join(workspace, f"Final_Video.mp4")
+        # 4. دمج صوت الخلفية الموسيقية (يبدأ دائماً من أول الفيديو، ولا يمتد فوق الخاتمة)
+        bg_music_path = r"C:\Users\User\OneDrive\Desktop\resilt\_gYjh863j4g.mp4"
+        if os.path.exists(bg_music_path):
+            print("\n   🎵 دمج صوت الخلفية الموسيقية بمستوى متوازن (12%) يبدأ من أول الكليب...")
+            try:
+                bg_music = (
+                    AudioFileClip(bg_music_path)
+                    .subclip(0, audio_clip.duration)
+                    .volumex(0.12)
+                    .audio_fadeout(0.4)
+                )
+                final_audio = CompositeAudioClip([audio_clip, bg_music])
+                video = video.set_audio(final_audio)
+            except Exception as e_bg:
+                print(f"   ⚠️ تعذر دمج صوت الخلفية ({e_bg})، استخدام الصوت الرئيسي فقط.")
+                video = video.set_audio(audio_clip)
+        else:
+            video = video.set_audio(audio_clip)
+        
+        # حفظ النتائج في مسار C:\Users\User\OneDrive\Desktop\resilt\ai
+        output_dir = r"C:\Users\User\OneDrive\Desktop\resilt\ai"
+        os.makedirs(output_dir, exist_ok=True)
+        clean_topic = re.sub(r'[\\/*?:"<>|]', "", topic).strip() or "video"
+        final_video_path = os.path.join(output_dir, f"{clean_topic}.mp4")
+        counter = 1
+        while os.path.exists(final_video_path):
+            final_video_path = os.path.join(output_dir, f"{clean_topic}_{counter}.mp4")
+            counter += 1
         print("\n⏳ جاري تصدير الفيديو (الرجاء الانتظار، قد يستغرق بعض الوقت بناءً على قوة جهازك)...")
         video.write_videofile(final_video_path, fps=24, codec="libx264", audio_codec="aac")
         try:
