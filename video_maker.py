@@ -113,11 +113,19 @@ def generate_script(topic):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     
     prompt = f"""
-    Write a short voiceover script for a video about the following topic: "{topic}".
-    CRITICAL INSTRUCTION:
-    - The script MUST be written in ENGLISH language. Even if the topic is provided in Arabic, you must write the voiceover script in English.
-    - The length of the script must be perfectly suited for a 40 to 60 seconds YouTube Short (approx 60 to 80 words).
-    - Provide ONLY the English text. Do not add any titles, quotes, or markdown formatting. Just the continuous text.
+    Write a high-retention viral voiceover script for a YouTube Short / TikTok about: "{topic}".
+    
+    CRITICAL STRUCTURE REQUIREMENTS:
+    1. THE HOOK (First 2-3 seconds / exactly 5 to 9 words):
+       - The very first sentence MUST be an irresistible, curiosity-inducing psychological HOOK that immediately stops the viewer from swiping away.
+       - NEVER start with greetings ("Hello", "Hey everyone"), intro phrases ("Today we talk about"), or boring definitions.
+       - Start immediately with a shocking fact, a provocative question, or an unbelievable mystery (e.g., "The biggest secret nobody tells you about...", "What if everything you believe about...", "You won't believe what happens when...").
+    2. THE STORY & VALUE (Next 40-50 seconds):
+       - Fast-paced, punchy, engaging narrative that quickly rewards the curiosity created by the hook.
+    3. LANGUAGE & FORMAT:
+       - The script MUST be written in ENGLISH (even if the topic is provided in Arabic).
+       - Total length: exactly 65 to 85 words (perfect for a 45-60 second Short).
+       - Output ONLY the spoken voiceover script text with no titles, quotes, brackets, or markdown formatting.
     """
     
     payload = {"model": "gpt-4o", "messages": [{"role": "user", "content": prompt}], "stream": False}
