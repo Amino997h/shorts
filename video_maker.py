@@ -82,30 +82,51 @@ CONFIG = load_config()
 def generate_voice(text, output_path):
     voice = CONFIG.get("voice", "en-US-GuyNeural - en-US (Male)")
     print(f"   🎙️ جاري توليد الصوت الواقعي الطبيعي ({voice})...")
-    try:
-        from gradio_client import Client
-        import shutil
-        client = Client("innoai/Edge-TTS-Text-to-Speech", verbose=False)
-        result = client.predict(
-            text,
-            voice,
-            0, # rate
-            0, # pitch
-            api_name="/tts_interface"
-        )
-        temp_audio = result[0]
-        shutil.copy(temp_audio, output_path)
-        print("   ✓ تم توليد الصوت العصبي فائق الجودة بنجاح!")
-        return True
-    except Exception as e:
-        print(f"   ⚠️ تعذر الاتصال بمحرك الصوت العصبي ({e})، جاري التراجع إلى الصوت البديل...")
+    
+    # حساب الحد الأدنى المتوقع لزمن الصوت لمنع أي ملفات مقطوعة أو فارغة
+    words_count = len(text.split())
+    expected_min_sec = max(12.0, words_count * 0.22)
+    
+    # 1. محاولة استخدام الصوت العصبي الفائق (Edge-TTS عبر Gradio) مع إعادة المحاولة والتحقق من الاكتمال
+    for attempt in range(1, 3):
         try:
-            tts = gTTS(text=text, lang='en', slow=False)
-            tts.save(output_path)
-            return True
-        except Exception as e2:
-            print(f"خطأ أثناء توليد الصوت: {e2}")
-            return False
+            from gradio_client import Client
+            import shutil
+            from pydub import AudioSegment
+            client = Client("innoai/Edge-TTS-Text-to-Speech", verbose=False)
+            result = client.predict(
+                text,
+                voice,
+                0, # rate
+                0, # pitch
+                api_name="/tts_interface"
+            )
+            temp_audio = result[0]
+            if os.path.exists(temp_audio) and os.path.getsize(temp_audio) > 10000:
+                audio_check = AudioSegment.from_file(temp_audio)
+                if audio_check.duration_seconds >= expected_min_sec:
+                    shutil.copy(temp_audio, output_path)
+                    print(f"   ✓ تم توليد الصوت العصبي فائق الجودة بنجاح ({round(audio_check.duration_seconds, 1)}s)!")
+                    return True
+                else:
+                    print(f"   ⚠️ تنبيه: الملف الصوتي المستلم مبتور ({round(audio_check.duration_seconds, 1)}s من أصل {words_count} كلمة)، محاولة ثانية...")
+        except Exception as e:
+            print(f"   ⚠️ محاولة {attempt} للصوت العصبي تعثرت ({e})...")
+        time.sleep(1)
+
+    # 2. التراجع الذكي إلى الصوت البديل المؤكد (gTTS) لضمان عدم توقف أو بتر الفيديو إطلاقاً
+    print("   🔄 جاري التحويل الفوري إلى محرك الصوت الاحتياطي المضمون (gTTS)...")
+    try:
+        from gtts import gTTS
+        from pydub import AudioSegment
+        tts = gTTS(text=text, lang='en', slow=False)
+        tts.save(output_path)
+        chk = AudioSegment.from_file(output_path)
+        print(f"   ✓ تم توليد الصوت البديل بنجاح كامل ({round(chk.duration_seconds, 1)}s)!")
+        return True
+    except Exception as e2:
+        print(f"خطأ أثناء توليد الصوت الاحتياطي: {e2}")
+        return False
 
 # --- 2. دوال الذكاء الاصطناعي (API المحلي) ---
 def generate_script(topic):
@@ -114,23 +135,31 @@ def generate_script(topic):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     
     prompt = f"""
-    Write a high-retention viral voiceover script for a YouTube Short / TikTok about: "{topic}".
+    You are an elite YouTube Shorts and TikTok viral scriptwriter with over 100 million views.
+    Write an ultra-high-retention viral voiceover script for a short-form video about: "{topic}".
     
-    CRITICAL STRUCTURE REQUIREMENTS:
-    1. THE HOOK (First 2-3 seconds / exactly 5 to 9 words):
-       - The very first sentence MUST be an irresistible, curiosity-inducing psychological HOOK that immediately stops the viewer from swiping away.
-       - NEVER start with greetings ("Hello", "Hey everyone"), intro phrases ("Today we talk about"), or boring definitions.
-       - Start immediately with a shocking fact, a provocative question, or an unbelievable mystery (e.g., "The biggest secret nobody tells you about...", "What if everything you believe about...", "You won't believe what happens when...").
-    2. THE STORY & VALUE (Next 40-50 seconds):
-       - Fast-paced, punchy, engaging narrative that quickly rewards the curiosity created by the hook.
-    3. LANGUAGE & FORMAT:
-       - The script MUST be written in ENGLISH (even if the topic is provided in Arabic).
-       - Total length: exactly 85 to 105 words (rich, high-retention narrative, about 5 seconds longer than standard).
-       - Output ONLY the spoken voiceover script text with no titles, quotes, brackets, or markdown formatting.
+    🔥 CRITICAL HOOK MASTERY (First 3 seconds / First sentence):
+    - The very first sentence MUST be an irresistible, pattern-interrupting PSYCHOLOGICAL HOOK that physically forces the viewer to stop swiping away.
+    - Use proven high-CTR viral hook styles:
+      * THE CONTRARIAN TRUTH / MYTH BUSTER: (e.g. "Almost everything you were told about [topic] is a complete lie.", "99% of people think this, but the reality is shocking.")
+      * THE URGENT WARNING / FOMO: (e.g. "If you are still doing this in 2026, stop immediately.", "You are losing money every day without knowing this.")
+      * THE BIZARRE / IMPOSSIBLE FACT: (e.g. "What if I told you the craziest secret about [topic]?", "This one bizarre fact sounds 100% made up, but it's real.")
+      * THE UNCOMFORTABLE QUESTION: (e.g. "Why does nobody talk about what actually happens when...?")
+    - ABSOLUTELY FORBIDDEN: NEVER start with greetings ("Hey guys", "Hello everyone"), boring introductions ("Today we will discuss", "Have you ever wondered"), or dry textbook definitions. Dive straight into the shocking hook.
+
+    ⚡ STORY PACING & VALUE (Next 35-45 seconds):
+    - Fast-paced, punchy, high-energy sentences that immediately reward the viewer's curiosity.
+    - Reveal actionable insights, mind-blowing twists, or practical secrets step-by-step.
+    - Keep the tension and curiosity high until the final word.
+
+    📏 STRICT FORMAT & LENGTH:
+    - Language: MUST be 100% in ENGLISH (even if the user topic is provided in Arabic).
+    - Length: EXACTLY 85 to 105 words (the viral sweet spot for 35 to 45 seconds).
+    - Output ONLY the spoken voiceover script text. Do NOT include titles, scene headings, emojis, quotes, or markdown formatting.
     """
     
     payload = {"model": "gpt-4o", "messages": [{"role": "user", "content": prompt}], "stream": False}
-    print("\n[الخطوة 1]: جاري التفكير وكتابة السكريبت...")
+    print("\n[الخطوة 1]: جاري التفكير وكتابة السكريبت الفيروسي الخارق...")
     try:
         response = requests.post(api_url, headers=headers, json=payload, timeout=60)
         response.raise_for_status()
@@ -282,6 +311,10 @@ def compress_speech_pauses(audio_path, factor=0.30, min_silence_len=250, silence
         new_audio += audio[last_end:]
         old_sec = round(len(audio)/1000, 1)
         new_sec = round(len(new_audio)/1000, 1)
+        # حماية أمان صارمة: إذا كان التقليص يحذف أكثر من نصف الملف فهذا يعني خطأ في كشف الصمت
+        if new_sec < old_sec * 0.50:
+            print(f"   ⚠️ تنبيه أمان: نسبة تقليص الصمت مبالغ فيها ({old_sec}s ➔ {new_sec}s)، الإبقاء على الصوت الأصلي.")
+            return
         print(f"   ✂️ تم تقليص فترات الصمت بين الجمل إلى 30% من الأصل بنجاح ({old_sec}s ➔ {new_sec}s)!")
         new_audio.export(audio_path, format="mp3")
     except Exception as e:
@@ -338,7 +371,13 @@ def main():
         for s in segments_iter:
             for w in s.words:
                 words_list.append(w)
-        speech_end_time = round(words_list[-1].end + 0.08, 2) if words_list else None
+        
+        # حماية صارمة: التحقق من اكتمال استخراج الكلمات
+        if len(words_list) < 15 and len(script.split()) > 30:
+            print("   ⚠️ تنبيه: عدد الكلمات المستخرجة قليل جداً، سيتم استخدام طول الصوت كاملاً بدون قص.")
+            speech_end_time = None
+        else:
+            speech_end_time = round(words_list[-1].end + 0.08, 2) if words_list else None
                 
         # قياس عرض الكلمات بدقة لمنع تصغير حجم الخط والحفاظ عليه ضخماً وموحداً دائماً
         font_file = os.path.join(os.path.dirname(__file__), "theboldfont.ttf")
@@ -763,7 +802,8 @@ def main():
 
         # تجميع الأجزاء (الهوك + الفيديو الأساسي + الخاتمة)
         has_outro = os.path.exists(outro_path)
-        cut_time = speech_end_time if (speech_end_time and speech_end_time < audio_clip.duration) else None
+        # أمان قاطع: قص الصمت النهائي فقط إذا تجاوز الكلام 15 ثانية وكان الفراغ طبيعياً لا يتجاوز 6 ثوانٍ
+        cut_time = speech_end_time if (speech_end_time and speech_end_time > 15.0 and speech_end_time < audio_clip.duration and (audio_clip.duration - speech_end_time) <= 6.0) else None
         
         if temp_hook_path or has_outro:
             print("\n🎬 [المونتاج النهائي]: جاري دمج الأجزاء وقص الصمت الميت...")
