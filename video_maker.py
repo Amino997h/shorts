@@ -169,10 +169,27 @@ def get_image_timings_from_segments(segments):
         if text.startswith("```json"): text = text[7:-3].strip()
         elif text.startswith("```"): text = text[3:-3].strip()
             
-        return json.loads(text)
+        try:
+            return json.loads(text)
+        except Exception:
+            import json_repair
+            repaired = json_repair.repair_json(text, return_objects=True)
+            if isinstance(repaired, list) and len(repaired) > 0:
+                return repaired
+            raise
     except Exception as e:
-        print(f"خطأ أثناء استخراج توقيت الصور: {e}")
-        return None
+        print(f"⚠️ تعذر استخراج توقيتات الصور من الذكاء الاصطناعي ({e})، جاري التوليد التلقائي لخطة الصور...")
+        fallback_plan = []
+        for s in segments:
+            clean_text = re.sub(r'[^a-zA-Z0-9\s]', '', s.get("text", "")).strip()
+            words = [w for w in clean_text.split() if len(w) > 3]
+            kw = " ".join(words[:4]) if words else "cinematic visual"
+            fallback_plan.append({
+                "keyword": kw,
+                "start": s["start"],
+                "end": s["end"]
+            })
+        return fallback_plan if fallback_plan else None
 
 # --- 3. العملية الأساسية ---
 
@@ -281,6 +298,7 @@ def main():
         return
     
     print("\n[الخطوة 3]: استخراج التوقيت الدقيق للكلمات (Faster-Whisper)...")
+    speech_end_time = None
     try:
         from faster_whisper import WhisperModel
         # نستخدم موديل صغير للسرعة
@@ -291,6 +309,7 @@ def main():
         for s in segments_iter:
             for w in s.words:
                 words_list.append(w)
+        speech_end_time = round(words_list[-1].end + 0.08, 2) if words_list else None
                 
         segments = []
         current_chunk = []
@@ -543,6 +562,57 @@ def main():
         final_video_path = os.path.join(workspace, f"Final_Video.mp4")
         print("\n⏳ جاري تصدير الفيديو (الرجاء الانتظار، قد يستغرق بعض الوقت بناءً على قوة جهازك)...")
         video.write_videofile(final_video_path, fps=24, codec="libx264", audio_codec="aac")
+        try:
+            video.close()
+            audio_clip.close()
+        except:
+            pass
+
+        # --- دمج الخاتمة التلقائي وقص الصمت النهائي بعد اكتمال البرنامج الأصلي بالكامل ---
+        outro_path = r"C:\Users\User\OneDrive\Desktop\resilt\6993530118_tk_2x.mp4"
+        if os.path.exists(outro_path):
+            print("\n🎬 [الخاتمة]: جاري إزالة صمت النهاية ودمج فيديو الاشتراك في نهاية المقطع...")
+            temp_with_outro = os.path.join(workspace, "temp_final_outro.mp4")
+            import subprocess
+            
+            # معرفة لحظة انتهاء الكلام بدقة لقطع الصمت الميت
+            cut_time = speech_end_time if (speech_end_time and speech_end_time < audio_clip.duration) else None
+            
+            if cut_time:
+                silence_gap = round(audio_clip.duration - cut_time, 2)
+                print(f"   ✂️ تم رصد {silence_gap} ثانية صمت ميت بعد انتهاء الكلام — قطع فوري وانتقال للخاتمة!")
+                filter_complex = (
+                    f"[0:v]trim=0:{cut_time:.2f},setpts=PTS-STARTPTS,fps=24[v0];"
+                    f"[0:a]atrim=0:{cut_time:.2f},asetpts=PTS-STARTPTS,aresample=44100,aformat=channel_layouts=stereo[a0];"
+                    f"[1:v]scale=1080:1920,setsar=1,fps=24[v1];"
+                    f"[1:a]aresample=44100,aformat=channel_layouts=stereo[a1];"
+                    f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]"
+                )
+            else:
+                filter_complex = (
+                    "[0:v]scale=1080:1920,setsar=1,fps=24[v0];"
+                    "[0:a]aresample=44100,aformat=channel_layouts=stereo[a0];"
+                    "[1:v]scale=1080:1920,setsar=1,fps=24[v1];"
+                    "[1:a]aresample=44100,aformat=channel_layouts=stereo[a1];"
+                    "[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]"
+                )
+
+            try:
+                cmd = [
+                    "ffmpeg", "-y", "-loglevel", "error",
+                    "-i", final_video_path,
+                    "-i", outro_path,
+                    "-filter_complex", filter_complex,
+                    "-map", "[v]", "-map", "[a]",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22",
+                    "-c:a", "aac", "-b:a", "192k",
+                    temp_with_outro
+                ]
+                subprocess.run(cmd, check=True)
+                os.replace(temp_with_outro, final_video_path)
+                print("✓ تم دمج خاتمة الاشتراك بنجاح وانتقال فوري بدون أي صمت!")
+            except Exception as e_outro:
+                print(f"⚠️ تعذر دمج الخاتمة ({e_outro})، سيتم استخدام الفيديو الأصلي.")
         
         total_time = round(time.time() - global_start_time, 2)
         print("\n" + "="*50)
