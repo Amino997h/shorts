@@ -272,15 +272,29 @@ def main():
                 words_list.append(w)
                 
         segments = []
-        chunk_size = 5
-        for i in range(0, len(words_list), chunk_size):
-            chunk = words_list[i:i+chunk_size]
-            text = "".join([w.word for w in chunk]).strip()
+        current_chunk = []
+        for w in words_list:
+            current_chunk.append(w)
+            w_text = w.word.strip()
+            # فصل الجمل تماماً عند علامات الترقيم لمنع دمج نهاية جملة مع بداية جملة أخرى
+            ends_sentence = any(w_text.endswith(p) for p in ('.', '!', '?', ';', ':'))
+            if len(current_chunk) >= 3 or ends_sentence:
+                text = " ".join([item.word.strip() for item in current_chunk])
+                segments.append({
+                    "start": round(current_chunk[0].start, 2),
+                    "end": round(current_chunk[-1].end, 2),
+                    "text": text,
+                    "words": [{"word": item.word.strip(), "start": item.start, "end": item.end} for item in current_chunk]
+                })
+                current_chunk = []
+                
+        if current_chunk:
+            text = " ".join([item.word.strip() for item in current_chunk])
             segments.append({
-                "start": round(chunk[0].start, 2),
-                "end": round(chunk[-1].end, 2),
+                "start": round(current_chunk[0].start, 2),
+                "end": round(current_chunk[-1].end, 2),
                 "text": text,
-                "words": [{"word": w.word, "start": w.start, "end": w.end} for w in chunk]
+                "words": [{"word": item.word.strip(), "start": item.start, "end": item.end} for item in current_chunk]
             })
     except ImportError:
         print("مكتبة faster-whisper غير مثبتة! سيتم التوقف.")
@@ -371,117 +385,120 @@ def main():
                         .set_duration(info["duration"]))
             clips.append(clip)
             
-                # 3. إضافة الترجمة المتزامنة مع تأثير الكتابة الديناميكي
+        # 3. إضافة الترجمة الاحترافية (The Bold Font + Italic + Wide + Word-by-Word Highlight)
+        font_path = os.path.join(os.path.dirname(__file__), "theboldfont.ttf")
+        if not os.path.exists(font_path):
+            font_path = "theboldfont.ttf"
+            
         try:
-            font = ImageFont.truetype("arialbd.ttf", 60)
+            font = ImageFont.truetype(font_path, 68)
         except:
-            font = ImageFont.load_default()
-            
-        def get_visible_text(words_list, t):
-            text = ""
-            for w in words_list:
-                if t >= w['end']:
-                    text += w['word']
-                elif t > w['start']:
-                    duration = w['end'] - w['start']
-                    if duration <= 0: duration = 0.001
-                    progress = (t - w['start']) / duration
-                    char_count = int(len(w['word']) * progress)
-                    text += w['word'][:char_count]
-                    break
-                else:
-                    break
-            return text.lstrip()
-            
-        def get_visible_lines(visible_text, full_lines):
-            visible_lines = []
-            remaining = len(visible_text)
-            for line in full_lines:
-                if remaining <= 0:
-                    break
-                if remaining >= len(line):
-                    visible_lines.append(line)
-                    remaining -= len(line) + 1
-                else:
-                    visible_lines.append(line[:remaining])
-                    remaining = 0
-            return visible_lines
+            try:
+                font = ImageFont.truetype("arialbd.ttf", 64)
+            except:
+                font = ImageFont.load_default()
 
         for i, seg in enumerate(segments):
-            text = seg["text"].strip()
-            if not text: continue
             words = seg.get("words", [])
             if not words: continue
             
-            full_lines = textwrap.wrap(text, width=32)
+            clean_words = [w["word"].strip() for w in words]
+            space_w = font.getlength(" ")
+            word_lens = [font.getlength(w) for w in clean_words]
+            total_text_w = sum(word_lens) + space_w * (len(clean_words) - 1)
             
-            total_h = 0
-            line_metrics = []
-            dummy_img = Image.new('RGBA', (1, 1))
-            dummy_draw = ImageDraw.Draw(dummy_img)
-            for line in full_lines:
-                bbox = dummy_draw.textbbox((0, 0), line, font=font)
-                w = bbox[2] - bbox[0]
-                h = bbox[3] - bbox[1]
-                line_metrics.append({'w': w, 'h': h, 'line': line})
-                total_h += h + 15
+            pad_x, pad_y = 50, 35
+            box_w = int(total_text_w + pad_x * 2)
+            box_h = 160
             
-            start_y = (450 - total_h) / 2
-            
-            for metric in line_metrics:
-                metric['x'] = (1080 - metric['w']) / 2
-                metric['y'] = start_y
-                start_y += metric['h'] + 15
+            # حساب المواقع الأفقية الثابتة لكل كلمة
+            word_positions = []
+            cur_x = pad_x
+            for w_len in word_lens:
+                word_positions.append(cur_x)
+                cur_x += w_len + space_w
 
-            class TextClipGenerator:
-                def __init__(self, full_lines, line_metrics, words):
-                    self.full_lines = full_lines
-                    self.line_metrics = line_metrics
+            class KaraokeClipGenerator:
+                def __init__(self, words, clean_words, word_positions, box_w, box_h, pad_y):
                     self.words = words
-                    self.last_t = -1
-                    self.last_img = None
+                    self.clean_words = clean_words
+                    self.word_positions = word_positions
+                    self.box_w = box_w
+                    self.box_h = box_h
+                    self.pad_y = pad_y
+                    self.cached_frames = {}
                     
-                def generate(self, t):
-                    if t == self.last_t and self.last_img is not None:
-                        return self.last_img
+                def render_frame(self, active_idx):
+                    if active_idx in self.cached_frames:
+                        return self.cached_frames[active_idx]
                         
-                    img_sub = Image.new('RGBA', (1080, 450), (0, 0, 0, 0))
-                    draw = ImageDraw.Draw(img_sub)
-                    current_global_t = t + self.words[0]['start']
+                    box = Image.new('RGBA', (self.box_w, self.box_h), (0, 0, 0, 0))
+                    draw = ImageDraw.Draw(box)
+                    y = self.pad_y
                     
-                    vis_text = get_visible_text(self.words, current_global_t)
-                    vis_lines = get_visible_lines(vis_text, self.full_lines)
+                    for idx, w_text in enumerate(self.clean_words):
+                        x = self.word_positions[idx]
+                        # 1. شادو ظل أسود عميق وكبير في الخلفية لعزل النص تماماً
+                        draw.text((x + 7, y + 9), w_text, font=font, fill=(0, 0, 0, 230), stroke_width=8, stroke_fill=(0, 0, 0, 230))
+                        
+                        # 2. النص الأساسي: أصفر للكلمة المنطوقة حالياً، وأبيض ناصع في باقي الكلمات
+                        is_active = (idx == active_idx)
+                        color = "#FFFF00" if is_active else "#FFFFFF"
+                        draw.text((x, y), w_text, font=font, fill=color, stroke_width=7, stroke_fill="black")
+                        
+                    # 3. جعل الكلام أعرض (Wider stretch)
+                    wider_w = int(self.box_w * 1.18)
+                    wider = box.resize((wider_w, self.box_h), Image.Resampling.LANCZOS)
+                    
+                    # 4. إمالة السطر (Italic slant عبر Affine Transformation)
+                    shear_extra = 45
+                    sheared = wider.transform(
+                        (wider_w + shear_extra, self.box_h),
+                        Image.AFFINE,
+                        (1, -0.18, 0, 0, 1, 0),
+                        resample=Image.Resampling.BICUBIC
+                    )
+                    
+                    # 5. التوسيط في شريط الترجمة العلوي (1080x450)
+                    canvas = Image.new('RGBA', (1080, 450), (0, 0, 0, 0))
+                    pos_x = (1080 - sheared.width) // 2
+                    pos_y = (450 - self.box_h) // 2
+                    canvas.paste(sheared, (pos_x, pos_y), sheared)
                     
                     import numpy as np
-                    if not vis_lines:
-                        self.last_img = np.array(img_sub)
-                        self.last_t = t
-                        return self.last_img
-                        
-                    for idx, v_line in enumerate(vis_lines):
-                        if not v_line: continue
-                        x = self.line_metrics[idx]['x']
-                        y = self.line_metrics[idx]['y']
-                        
-                        draw.text((x-3, y-3), v_line, font=font, fill="black")
-                        draw.text((x+3, y-3), v_line, font=font, fill="black")
-                        draw.text((x-3, y+3), v_line, font=font, fill="black")
-                        draw.text((x+3, y+3), v_line, font=font, fill="black")
-                        
-                        draw.text((x, y), v_line, font=font, fill="yellow")
+                    frame_array = np.array(canvas)
+                    self.cached_frames[active_idx] = frame_array
+                    return frame_array
+
+                def generate(self, t):
+                    current_global_t = t + self.words[0]['start']
+                    active_idx = -1
                     
-                    self.last_img = np.array(img_sub)
-                    self.last_t = t
-                    return self.last_img
-                    
+                    for idx, w in enumerate(self.words):
+                        if w['start'] <= current_global_t <= w['end']:
+                            active_idx = idx
+                            break
+                            
+                    if active_idx == -1:
+                        # إذا كان بين كلمتين، نميز الكلمة التي تم نطقها للتو
+                        for idx, w in enumerate(self.words):
+                            if current_global_t >= w['start']:
+                                active_idx = idx
+                                
+                    if active_idx == -1 and len(self.words) > 0:
+                        active_idx = 0
+                        
+                    return self.render_frame(active_idx)
+
                 def get_rgb(self, t):
                     return self.generate(t)[:, :, :3]
                     
                 def get_mask(self, t):
                     return self.generate(t)[:, :, 3] / 255.0
 
-            gen = TextClipGenerator(full_lines, line_metrics, words)
+            gen = KaraokeClipGenerator(words, clean_words, word_positions, box_w, box_h, pad_y)
             duration = seg["end"] - seg["start"]
+            if duration <= 0: duration = 0.1
             
             txt_clip = VideoClip(gen.get_rgb, duration=duration).set_mask(VideoClip(gen.get_mask, ismask=True, duration=duration))
             txt_clip = txt_clip.set_start(seg["start"]).set_position(("center", 0))
