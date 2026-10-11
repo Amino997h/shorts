@@ -692,6 +692,7 @@ def main():
 
         # --- دمج الهوك البصري الافتتاحي والخاتمة التلقائية وقص الصمت النهائي ---
         hook_dir = r"C:\Users\User\OneDrive\Desktop\resilt\hook"
+        hook_audio_source = r"C:\Users\User\OneDrive\Desktop\resilt\Am4wYTiHHx8.mp4"
         outro_path = r"C:\Users\User\OneDrive\Desktop\resilt\6993530118_tk_2x.mp4"
         
         temp_hook_path = None
@@ -702,32 +703,61 @@ def main():
                 hook_name = os.path.basename(selected_hook)
                 print(f"\n🎯 [الهوك البصري]: تم اختيار هوك عشوائي ({hook_name}) للبداية...")
                 try:
+                    # فحص مدة الهوك بدقة كاملة دون أي قص
                     probe_cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", selected_hook]
                     res = subprocess.run(probe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                     hook_dur = float(res.stdout.strip())
-                    active_dur = max(0.15, hook_dur - 0.20)
+                    
+                    # فحص مدة الصوت الخارجي لضبط التزامن حتى تنتهي نهاية الصوت مع نهاية الهوك تماماً
+                    sound_dur = 0.0
+                    if os.path.exists(hook_audio_source):
+                        probe_snd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", hook_audio_source]
+                        res_snd = subprocess.run(probe_snd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                        sound_dur = float(res_snd.stdout.strip())
                     
                     temp_hook_file = os.path.join(workspace, "temp_prepared_hook.mp4")
-                    # اقتطاع 0.2 ثانية من نهاية الهوك وتحويلها لشاشة سوداء صامتة مع تقليل صوت الهوك (volume=0.6)
-                    hook_prep_cmd = [
-                        "ffmpeg", "-y", "-loglevel", "error",
-                        "-i", selected_hook,
-                        "-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=24:d=0.2",
-                        "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo:d=0.2",
-                        "-filter_complex",
-                        f"[0:v]trim=0:{active_dur:.2f},setpts=PTS-STARTPTS,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=24[v0];"
-                        f"[0:a]atrim=0:{active_dur:.2f},asetpts=PTS-STARTPTS,volume=0.6,aresample=44100,aformat=channel_layouts=stereo[a0];"
-                        f"[1:v]setsar=1,fps=24[v_b];"
-                        f"[2:a]aresample=44100,aformat=channel_layouts=stereo[a_b];"
-                        f"[v0][a0][v_b][a_b]concat=n=2:v=1:a=1[v][a]",
-                        "-map", "[v]", "-map", "[a]",
-                        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
-                        "-c:a", "aac", "-b:a", "192k",
-                        temp_hook_file
-                    ]
+                    
+                    # حساب نقطة بداية الصوت بحيث تنتهي تماماً مع نهاية الهوك، يليه 0.1 ثانية شاشة سوداء صامتة
+                    if sound_dur > 0 and sound_dur >= hook_dur:
+                        sound_start = round(sound_dur - hook_dur, 3)
+                        hook_prep_cmd = [
+                            "ffmpeg", "-y", "-loglevel", "error",
+                            "-i", selected_hook,
+                            "-ss", f"{sound_start:.3f}", "-i", hook_audio_source,
+                            "-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=24:d=0.1",
+                            "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo:d=0.1",
+                            "-filter_complex",
+                            f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=24[v0];"
+                            f"[1:a]atrim=0:{hook_dur:.3f},asetpts=PTS-STARTPTS,aresample=44100,aformat=channel_layouts=stereo[a0];"
+                            f"[2:v]setsar=1,fps=24[v_b];"
+                            f"[3:a]aresample=44100,aformat=channel_layouts=stereo[a_b];"
+                            f"[v0][a0][v_b][a_b]concat=n=2:v=1:a=1[v][a]",
+                            "-map", "[v]", "-map", "[a]",
+                            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
+                            "-c:a", "aac", "-b:a", "192k",
+                            temp_hook_file
+                        ]
+                    else:
+                        hook_prep_cmd = [
+                            "ffmpeg", "-y", "-loglevel", "error",
+                            "-i", selected_hook,
+                            "-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=24:d=0.1",
+                            "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo:d=0.1",
+                            "-filter_complex",
+                            f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=24[v0];"
+                            f"[2:a]atrim=0:{hook_dur:.3f},asetpts=PTS-STARTPTS,aresample=44100,aformat=channel_layouts=stereo[a0];"
+                            f"[1:v]setsar=1,fps=24[v_b];"
+                            f"[2:a]aresample=44100,aformat=channel_layouts=stereo[a_b];"
+                            f"[v0][a0][v_b][a_b]concat=n=2:v=1:a=1[v][a]",
+                            "-map", "[v]", "-map", "[a]",
+                            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
+                            "-c:a", "aac", "-b:a", "192k",
+                            temp_hook_file
+                        ]
+                        
                     subprocess.run(hook_prep_cmd, check=True)
                     temp_hook_path = temp_hook_file
-                    print("   ✓ تم تجهيز الهوك البصري مع شاشة التعتيم وخفض الصوت بنجاح!")
+                    print("   ✓ تم تجهيز الهوك بالكامل مع مزامنة نهاية الصوت والشاشة السوداء (0.1s) بنجاح!")
                 except Exception as e_hk:
                     print(f"   ⚠️ تعذر تجهيز الهوك البصري ({e_hk})، سيتم تجاوزه.")
 
