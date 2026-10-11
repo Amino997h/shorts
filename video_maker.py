@@ -449,9 +449,13 @@ def main():
         bg_clip = ColorClip(size=(1080, 1920), color=(15, 15, 18)).set_duration(audio_clip.duration)
         clips = [bg_clip]
 
-        # 2. إعداد مقطع الجيم بلاي في النصف السفلي (Y: 960 إلى 1920) مع اختيار مقطع عشوائي في كل مرة
-        gameplay_path = r"C:\Users\User\OneDrive\Desktop\resilt\videoplayback.mp4"
-        if os.path.exists(gameplay_path):
+        # 2. إعداد مقطع الجيم بلاي في النصف السفلي (Y: 960 إلى 1920) بدقة عالية مع اختيار مقطع عشوائي في كل مرة
+        gameplay_candidates = [
+            r"C:\Users\User\OneDrive\Desktop\resilt\document_5936256664112996112.mp4",
+            r"C:\Users\User\OneDrive\Desktop\resilt\videoplayback.mp4"
+        ]
+        gameplay_path = next((p for p in gameplay_candidates if os.path.exists(p)), None)
+        if gameplay_path:
             try:
                 import random
                 # فحص مدة فيديو الجيم بلاي
@@ -462,14 +466,14 @@ def main():
                 needed_dur = audio_clip.duration + 1.0
                 max_start = max(0, total_gameplay_dur - needed_dur - 2.0)
                 random_start = random.uniform(5.0, max_start) if max_start > 5.0 else 0.0
-                print(f"   🎮 تم اختيار مقطع جيم بلاي عشوائي يبدأ من الثانية {random_start:.1f} إلى {random_start + needed_dur:.1f}...")
+                print(f"   🎮 تم اختيار مقطع جيم بلاي عالي الدقة عشوائي يبدأ من الثانية {random_start:.1f} إلى {random_start + needed_dur:.1f}...")
 
                 slice_path = os.path.join(workspace, "gameplay_slice.mp4")
-                # معالجة فورية فائقة الوضوح عبر FFmpeg: تكبير Lanczos + نسبة أبعاد مربعة setsar=1 لمنع أي ضغط أو تشوه + فلتر توضيح التفاصيل + جودة CRF 18
+                # معالجة فورية فائقة الوضوح عبر FFmpeg: ضبط أبعاد 1080x960 مع المحافظة على النسبة الأصلية 16:9 + setsar=1 + fps=24
                 cut_cmd = [
                     "ffmpeg", "-y", "-ss", f"{random_start:.2f}", "-t", f"{needed_dur:.2f}",
                     "-i", gameplay_path,
-                    "-vf", "scale=1706:960:flags=lanczos,crop=1080:960,setsar=1,unsharp=5:5:0.7:5:5:0.0",
+                    "-vf", "scale=1706:960:flags=lanczos,crop=1080:960,setsar=1,fps=24",
                     "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
                     "-an", slice_path
                 ]
