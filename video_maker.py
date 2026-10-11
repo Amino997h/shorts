@@ -409,27 +409,57 @@ def main():
         
         audio_clip = AudioFileClip(audio_path)
         
-        # 1. إعداد فيديو الخلفية الرئيسي
-        bg_video_path = r"C:\Users\User\Downloads\Video Project.mp4"
-        if os.path.exists(bg_video_path):
-            bg_clip = VideoFileClip(bg_video_path)
-            # تكبيره ليملأ الشاشة (1920) وقص الزوائد من المنتصف ليكون العرض 1080
-            bg_clip = bg_clip.resize(height=1920)
-            if bg_clip.w < 1080:
-                bg_clip = bg_clip.resize(width=1080)
-            x_center = bg_clip.w / 2
-            bg_clip = bg_clip.crop(x1=x_center-540, y1=0, x2=x_center+540, y2=1920)
-            
-            # تكرار الخلفية لتناسب مدة الصوت
-            bg_clip = bg_clip.fx(vfx.loop, duration=audio_clip.duration)
-        else:
-            print("تنبيه: فيديو الخلفية غير موجود، سيتم وضع خلفية سوداء.")
-            bg_clip = ColorClip(size=(1080, 1920), color=(0,0,0)).set_duration(audio_clip.duration)
-            
+        # 1. إعداد الخلفية الأساسية (خلفية داكنة راقية بدقة 1080x1920)
+        bg_clip = ColorClip(size=(1080, 1920), color=(15, 15, 18)).set_duration(audio_clip.duration)
         clips = [bg_clip]
-        
-        # 2. إضافة الصور بحدود دقيقة (Margin Left/Right 100, Top 350, Bottom 250)
-        # المنطقة الآمنة عرضها 880 وارتفاعها 1220 (لترك 450 بكسل للنص)
+
+        # 2. إعداد مقطع الجيم بلاي في النصف السفلي (Y: 960 إلى 1920) مع اختيار مقطع عشوائي في كل مرة
+        gameplay_path = r"C:\Users\User\OneDrive\Desktop\resilt\videoplayback.mp4"
+        if os.path.exists(gameplay_path):
+            try:
+                import random
+                # فحص مدة فيديو الجيم بلاي
+                probe_cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", gameplay_path]
+                res = subprocess.run(probe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                total_gameplay_dur = float(res.stdout.strip())
+                
+                needed_dur = audio_clip.duration + 1.0
+                max_start = max(0, total_gameplay_dur - needed_dur - 2.0)
+                random_start = random.uniform(5.0, max_start) if max_start > 5.0 else 0.0
+                print(f"   🎮 تم اختيار مقطع جيم بلاي عشوائي يبدأ من الثانية {random_start:.1f} إلى {random_start + needed_dur:.1f}...")
+
+                slice_path = os.path.join(workspace, "gameplay_slice.mp4")
+                cut_cmd = [
+                    "ffmpeg", "-y", "-ss", f"{random_start:.2f}", "-t", f"{needed_dur:.2f}",
+                    "-i", gameplay_path,
+                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+                    "-an", slice_path
+                ]
+                subprocess.run(cut_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                
+                gameplay_clip = VideoFileClip(slice_path).without_audio()
+                # جعل الارتفاع 960 وملء العرض 1080
+                gameplay_clip = gameplay_clip.resize(height=960)
+                if gameplay_clip.w < 1080:
+                    gameplay_clip = gameplay_clip.resize(width=1080)
+                x_center = gameplay_clip.w / 2
+                gameplay_clip = gameplay_clip.crop(x1=x_center - 540, y1=0, x2=x_center + 540, y2=960)
+                gameplay_clip = (
+                    gameplay_clip.set_position((0, 960))
+                    .set_duration(audio_clip.duration)
+                )
+                clips.append(gameplay_clip)
+            except Exception as e_gp:
+                print(f"   ⚠️ تعذر تجهيز مقطع الجيم بلاي ({e_gp})، سيتم المتابعة بدونه.")
+        else:
+            print("   ⚠️ ملف الجيم بلاي غير موجود، سيتم الاعتماد على الخلفية الأساسية.")
+
+        # 3. خط فاصل احترافي ودقيق في المنتصف بين الصور والجيم بلاي (عند Y = 958)
+        divider_clip = ColorClip(size=(1080, 4), color=(35, 35, 42)).set_duration(audio_clip.duration).set_position((0, 958))
+        clips.append(divider_clip)
+
+        # 4. إضافة الصور التوضيحية في النصف العلوي (Y: 0 إلى 960)
+        # المنطقة المخصصة للصور: العرض حتى 1000 والارتفاع حتى 880 (مركز الـ Y عند 480)
         for info in downloaded_clips_info:
             img_path = info["path"]
             
@@ -441,13 +471,13 @@ def main():
                     pil_img.save(img_path)
                     
             img = ImageClip(img_path)
-            w_ratio = 880 / img.w
-            h_ratio = 1220 / img.h
+            w_ratio = 1000 / img.w
+            h_ratio = 880 / img.h
             scale = min(w_ratio, h_ratio)
             
             clip = img.resize(scale)
-            # توسيطها في منطقة الـ Safe Zone (التي يبدأ الـ Y الخاص بها من 350)
-            center_y = 450 + (1220 / 2)
+            # توسيطها في النصف العلوي تماماً
+            center_y = 480
             clip = (clip.set_position(("center", center_y - clip.h / 2))
                         .set_start(info["start"])
                         .set_duration(info["duration"]))
@@ -538,10 +568,10 @@ def main():
                         final_w = sheared.width
                         final_h = self.box_h
                     
-                    # 6. التوسيط في شريط الترجمة العلوي (1080x450)
-                    canvas = Image.new('RGBA', (1080, 450), (0, 0, 0, 0))
+                    # 6. التوسيط في شريط الترجمة في منتصف الشاشة (1080x260)
+                    canvas = Image.new('RGBA', (1080, 260), (0, 0, 0, 0))
                     pos_x = (1080 - final_w) // 2
-                    pos_y = (450 - final_h) // 2
+                    pos_y = (260 - final_h) // 2
                     canvas.paste(sheared, (pos_x, pos_y), sheared)
                     
                     import numpy as np
@@ -580,7 +610,8 @@ def main():
             if duration <= 0: duration = 0.1
             
             txt_clip = VideoClip(gen.get_rgb, duration=duration).set_mask(VideoClip(gen.get_mask, ismask=True, duration=duration))
-            txt_clip = txt_clip.set_start(seg["start"]).set_position(("center", 0))
+            # وضع الترجمة في المنتصف تماماً فوق الخط الفاصل بين النصفين (مركز Y = 960)
+            txt_clip = txt_clip.set_start(seg["start"]).set_position(("center", 960 - 130))
             
             clips.append(txt_clip)
 
