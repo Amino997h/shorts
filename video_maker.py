@@ -274,22 +274,62 @@ def upload_to_telegram(video_path, topic, script=""):
         caption = generate_smart_fallback(topic)
         
     caption = caption[:1000] # ضمان عدم تجاوز حد تيليجرام الصارم (1024 حرف)
-    print("جاري الرفع إلى قناة التيليجرام (قد يستغرق بعض الوقت حسب حجم الفيديو)...")
     
     bot_token = CONFIG.get("bot_token")
     channel_id = CONFIG.get("channel_id")
-    
     url = f"https://api.telegram.org/bot{bot_token}/sendVideo"
     
-    try:
-        with open(video_path, 'rb') as video_file:
-            data = {'chat_id': channel_id, 'caption': caption}
-            files = {'video': video_file}
-            resp = requests.post(url, data=data, files=files, timeout=600)
-            resp.raise_for_status()
-        print("✓ تم النشر على قناة تيليجرام بنجاح!")
-    except Exception as e:
-        print(f"خطأ أثناء النشر على تيليجرام: {e}")
+    # فحص حجم الفيديو بدقة لضمان عدم تجاوز حد تيليجرام الصارم (50 ميغابايت)
+    file_size_mb = os.path.getsize(video_path) / (1024 * 1024)
+    upload_file = video_path
+    temp_compressed = None
+    
+    if file_size_mb >= 48.0:
+        print(f"\n   ⚙️ حجم الفيديو ({round(file_size_mb, 1)}MB) يتجاوز حد تيليجرام المسموح للبوتات (50MB).")
+        print("   🚀 جاري تكييف الحجم تلقائياً بأعلى جودة لضمان الرفع السلس والمضمون...")
+        temp_compressed = os.path.join(os.path.dirname(video_path), "tele_upload_temp.mp4")
+        comp_cmd = [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-i", video_path,
+            "-c:v", "libx264", "-crf", "23", "-preset", "fast",
+            "-c:a", "copy",
+            temp_compressed
+        ]
+        try:
+            import subprocess
+            subprocess.run(comp_cmd, check=True)
+            upload_file = temp_compressed
+            new_mb = os.path.getsize(upload_file) / (1024 * 1024)
+            print(f"   ✓ تم تجهيز نسخة النشر لتيليجرام بنجاح ({round(new_mb, 1)}MB)!")
+        except Exception as e_comp:
+            print(f"   ⚠️ تعذر التكييف التلقائي ({e_comp})، جاري محاولة رفع الملف الأصلي...")
+            upload_file = video_path
+
+    # محاولات رفع مؤكدة مع إعادة المحاولة التلقائية في حال حدوث أي تقلب بالشبكة
+    for attempt in range(1, 4):
+        try:
+            print(f"جاري الرفع إلى قناة التيليجرام (المحاولة {attempt}/3)...")
+            with open(upload_file, 'rb') as video_file:
+                data = {'chat_id': channel_id, 'caption': caption}
+                files = {'video': video_file}
+                resp = requests.post(url, data=data, files=files, timeout=600)
+                resp.raise_for_status()
+                res_data = resp.json()
+                if res_data.get("ok"):
+                    print("✓ تم النشر على قناة تيليجرام بنجاح!")
+                    break
+        except Exception as e:
+            print(f"   ⚠️ المحاولة {attempt} للنشر تعثرت ({e})...")
+            if attempt < 3:
+                time.sleep(3)
+            else:
+                print("❌ تعذر النشر على تيليجرام بعد 3 محاولات.")
+                
+    if temp_compressed and os.path.exists(temp_compressed):
+        try:
+            os.remove(temp_compressed)
+        except:
+            pass
 
 def compress_speech_pauses(audio_path, factor=0.30, min_silence_len=250, silence_thresh=-35):
     """تقليص الفراغات الصامتة بين الجمل إلى 30% من المدة الأصلية لتسريع وتيرة الكلام دون تسريع الكلمات نفسها."""
@@ -722,7 +762,7 @@ def main():
             final_video_path = os.path.join(output_dir, f"{clean_topic}_{counter}.mp4")
             counter += 1
         print("\n⏳ جاري تصدير الفيديو (الرجاء الانتظار، قد يستغرق بعض الوقت بناءً على قوة جهازك)...")
-        video.write_videofile(final_video_path, fps=24, codec="libx264", audio_codec="aac")
+        video.write_videofile(final_video_path, fps=24, codec="libx264", audio_codec="aac", bitrate="4500k", preset="fast")
         try:
             video.close()
             audio_clip.close()
