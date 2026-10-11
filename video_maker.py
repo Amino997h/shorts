@@ -340,14 +340,49 @@ def main():
                 words_list.append(w)
         speech_end_time = round(words_list[-1].end + 0.08, 2) if words_list else None
                 
+        # قياس عرض الكلمات بدقة لمنع تصغير حجم الخط والحفاظ عليه ضخماً وموحداً دائماً
+        font_file = os.path.join(os.path.dirname(__file__), "theboldfont.ttf")
+        if not os.path.exists(font_file):
+            font_file = "theboldfont.ttf"
+        try:
+            from PIL import ImageFont
+            measure_font = ImageFont.truetype(font_file, 68)
+        except:
+            from PIL import ImageFont
+            measure_font = ImageFont.load_default()
+        space_w = measure_font.getlength(" ")
+
+        def calc_chunk_width(chunk):
+            if not chunk: return 0
+            words = [it.word.strip() for it in chunk]
+            w_sum = sum(measure_font.getlength(w) for w in words)
+            spaces = space_w * (len(words) - 1)
+            return int((w_sum + spaces + 100) * 1.18) + 45
+
         segments = []
         current_chunk = []
         for w in words_list:
-            current_chunk.append(w)
             w_text = w.word.strip()
+            # فحص ما إذا كانت إضافة الكلمة ستجعل السطر يتجاوز العرض المسموح (840px)
+            tentative_chunk = current_chunk + [w]
+            expected_width = calc_chunk_width(tentative_chunk)
+            
+            # إذا تجاوز العرض الأقصى أو وصل لـ 3 كلمات، نضحي بالكلمة وننهي المجموعة السابقة فوراً
+            if current_chunk and (expected_width > 840 or len(current_chunk) >= 3):
+                text = " ".join([item.word.strip() for item in current_chunk])
+                segments.append({
+                    "start": round(current_chunk[0].start, 2),
+                    "end": round(current_chunk[-1].end, 2),
+                    "text": text,
+                    "words": [{"word": item.word.strip(), "start": item.start, "end": item.end} for item in current_chunk]
+                })
+                current_chunk = [w]
+            else:
+                current_chunk.append(w)
+                
             # فصل الجمل تماماً عند علامات الترقيم لمنع دمج نهاية جملة مع بداية جملة أخرى
             ends_sentence = any(w_text.endswith(p) for p in ('.', '!', '?', ';', ':'))
-            if len(current_chunk) >= 3 or ends_sentence:
+            if ends_sentence and current_chunk:
                 text = " ".join([item.word.strip() for item in current_chunk])
                 segments.append({
                     "start": round(current_chunk[0].start, 2),
@@ -430,23 +465,20 @@ def main():
                 print(f"   🎮 تم اختيار مقطع جيم بلاي عشوائي يبدأ من الثانية {random_start:.1f} إلى {random_start + needed_dur:.1f}...")
 
                 slice_path = os.path.join(workspace, "gameplay_slice.mp4")
+                # معالجة فورية فائقة الوضوح عبر FFmpeg: تكبير Lanczos + نسبة أبعاد مربعة setsar=1 لمنع أي ضغط أو تشوه + فلتر توضيح التفاصيل + جودة CRF 18
                 cut_cmd = [
                     "ffmpeg", "-y", "-ss", f"{random_start:.2f}", "-t", f"{needed_dur:.2f}",
                     "-i", gameplay_path,
-                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+                    "-vf", "scale=1706:960:flags=lanczos,crop=1080:960,setsar=1,unsharp=5:5:0.7:5:5:0.0",
+                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
                     "-an", slice_path
                 ]
                 subprocess.run(cut_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
                 
-                gameplay_clip = VideoFileClip(slice_path).without_audio()
-                # جعل الارتفاع 960 وملء العرض 1080
-                gameplay_clip = gameplay_clip.resize(height=960)
-                if gameplay_clip.w < 1080:
-                    gameplay_clip = gameplay_clip.resize(width=1080)
-                x_center = gameplay_clip.w / 2
-                gameplay_clip = gameplay_clip.crop(x1=x_center - 540, y1=0, x2=x_center + 540, y2=960)
                 gameplay_clip = (
-                    gameplay_clip.set_position((0, 960))
+                    VideoFileClip(slice_path)
+                    .without_audio()
+                    .set_position((0, 960))
                     .set_duration(audio_clip.duration)
                 )
                 clips.append(gameplay_clip)
