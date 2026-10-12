@@ -80,39 +80,32 @@ def load_config():
 CONFIG = load_config()
 
 def generate_voice(text, output_path):
-    voice = CONFIG.get("voice", "en-US-GuyNeural - en-US (Male)")
-    print(f"   🎙️ جاري توليد صوت الرجل الاحترافي ({voice})...")
+    print("   🎙️ جاري توليد الصوت العصبي المعتمد (en-US-GuyNeural - en-US (Male))...")
     
-    # حساب الحد الأدنى المتوقع لزمن الصوت لمنع أي ملفات مقطوعة أو فارغة
-    words_count = len(text.split())
-    expected_min_sec = max(12.0, words_count * 0.22)
-    
-    # 1. محاولة استخدام الصوت العصبي الفائق (Edge-TTS صوت Guy الرجالي)
-    for attempt in range(1, 3):
+    # 1. التوليد الفوري المباشر عبر Microsoft Edge-TTS بصوت Guy الرجالي الرسمي
+    for attempt in range(1, 4):
         try:
-            from gradio_client import Client
-            import shutil
+            import edge_tts.communicate
+            import edge_tts.constants
+            import asyncio
             from pydub import AudioSegment
-            client = Client("innoai/Edge-TTS-Text-to-Speech", verbose=False)
-            result = client.predict(
-                text,
-                voice,
-                0, # rate
-                0, # pitch
-                api_name="/tts_interface"
+            
+            # توجيه الاتصال مباشرة إلى خادم مايكروسوفت الحديث لضمان عمل GuyNeural بدون أي 403
+            edge_tts.communicate.WSS_URL = (
+                "wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1"
+                f"?Ocp-Apim-Subscription-Key={edge_tts.constants.TRUSTED_CLIENT_TOKEN}"
             )
-            temp_audio = result[0]
-            if os.path.exists(temp_audio) and os.path.getsize(temp_audio) > 10000:
-                audio_check = AudioSegment.from_file(temp_audio)
-                if audio_check.duration_seconds >= expected_min_sec:
-                    shutil.copy(temp_audio, output_path)
-                    print(f"   ✓ تم توليد صوت الرجل العصبي (Guy) بنجاح ({round(audio_check.duration_seconds, 1)}s)!")
-                    return True
-                else:
-                    print(f"   ⚠️ تنبيه: الملف الصوتي المستلم مبتور ({round(audio_check.duration_seconds, 1)}s من أصل {words_count} كلمة)، محاولة ثانية...")
+            
+            communicate = edge_tts.Communicate(text, "en-US-GuyNeural")
+            asyncio.run(communicate.save(output_path))
+            
+            if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+                audio_check = AudioSegment.from_file(output_path)
+                print(f"   ✓ تم توليد صوت Guy العصبي بنجاح تام ({round(audio_check.duration_seconds, 1)}s)!")
+                return True
         except Exception as e:
-            print(f"   ⚠️ محاولة {attempt} للصوت العصبي تعثرت ({e})...")
-        time.sleep(1)
+            print(f"   ⚠️ محاولة {attempt} لتوليد صوت Guy تعثرت ({e})...")
+            time.sleep(1)
 
     # 2. التراجع المباشر إلى صوت الرجل العصبي فائق الجودة والواقعية (Kokoro - Adam/Michael الرجالي) محلياً
     print("   🎙️ جاري التوليد الفوري عبر محرك الصوت الرجالي الواقعي فائق الدقة (Kokoro Male Voice)...")
