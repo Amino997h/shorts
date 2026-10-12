@@ -234,26 +234,27 @@ def upload_to_telegram(video_path, topic, script=""):
     script_context = f"\nVideo Script:\n{script}\n" if script else ""
     
     prompt = f"""
-    You are a viral YouTube Shorts and TikTok content strategist.
-    Write an irresistible, high-CTR metadata package for this video topic: "{topic}".{script_context}
+    You are an elite YouTube Shorts and TikTok content strategist.
+    Create a viral, high-CTR metadata package in English for a video about: "{topic}".{script_context}
     
-    CRITICAL REQUIREMENTS:
+    CRITICAL FORMAT:
+    Respond ONLY with a valid JSON object containing exactly these 3 fields:
+    {{
+      "title": "A viral, curiosity-inducing title with 1-2 relevant emojis (e.g. 😱 Why Trees Are Rarer Than Diamonds in Space! 💎)",
+      "description": "An exciting, high-retention 2-3 sentence description revealing the mind-blowing truth from the video, ending with an engaging question that prompts viewers to comment.",
+      "hashtags": "6 to 8 viral, high-traffic hashtags matching the topic (e.g. #Shorts #DidYouKnow #Viral #Facts #Science #MindBlowing)"
+    }}
+    
+    IMPORTANT:
     - Everything MUST be written in ENGLISH language.
-    - Structure EXACTLY in 4 lines:
-      Line 1 (ATTRACTIVE TITLE): A viral, curiosity-driven title with 1-2 relevant emojis (e.g. "😱 Why Trees Are Rarer Than Diamonds in Space! 💎").
-      Line 2 (HOOK DESCRIPTION): One fascinating, curiosity-inducing sentence revealing the core mind-blowing truth from the video.
-      Line 3 (CALL TO ACTION): A short, engaging question prompting comments (e.g. "Did you know this? Let us know what you think below! 👇").
-      Line 4 (VIRAL HASHTAGS): Exactly 6 high-traffic, algorithm-friendly hashtags matching the topic (e.g. #Shorts #DidYouKnow #Viral #Facts #ScienceFacts #MindBlowing).
-      
-    - Output ONLY the 4 lines. Do NOT write labels like "Line 1:", brackets, or conversational preamble.
+    - Output ONLY the JSON object. Do not include markdown code block syntax or conversational text.
     """
     
     def generate_smart_fallback(t):
         clean_t = t.strip().title()
         return (
-            f"🤯 The Mind-Blowing Truth About {clean_t}! 🚀\n"
-            f"Discover the unbelievable facts you never knew about {clean_t}!\n"
-            f"Did you know this? Share your thoughts in the comments! 👇\n"
+            f"🤯 The Mind-Blowing Truth About {clean_t}! 🚀\n\n"
+            f"Discover the unbelievable facts and hidden secrets about {clean_t} that almost nobody talks about! Did this surprise you? Share your thoughts in the comments below! 👇\n\n"
             f"#Shorts #DidYouKnow #Viral #Facts #Trending #MindBlowing"
         )
     
@@ -261,14 +262,40 @@ def upload_to_telegram(video_path, topic, script=""):
     try:
         response = requests.post(api_url, headers=headers, json=payload, timeout=30)
         response.raise_for_status()
-        raw_caption = response.json()['choices'][0]['message']['content'].strip()
+        raw_response = response.json()['choices'][0]['message']['content'].strip()
         
-        # حماية صارمة: التأكد من أن الوصف لا يتجاوز حد تيليجرام ولا يحتوي على مخرجات الشاشة
-        if len(raw_caption) > 800 or any(bad_word in raw_caption for bad_word in ["الخطوة", "Whisper", "جاري", "Building video", "MoviePy"]):
-            print("⚠️ الوصف المستلم من السيرفر غير ملائم، استخدام القالب الفيروسي المعتمد.")
+        # حماية صارمة: استبعاد أي مخرجات غير مناسبة
+        if any(bad_word in raw_response for bad_word in ["الخطوة", "Whisper", "جاري", "Building video", "MoviePy"]):
             caption = generate_smart_fallback(topic)
         else:
-            caption = raw_caption
+            clean_str = raw_response
+            if clean_str.startswith("```json"): clean_str = clean_str[7:-3].strip()
+            elif clean_str.startswith("```"): clean_str = clean_str[3:-3].strip()
+            
+            parsed = None
+            try:
+                parsed = json.loads(clean_str)
+            except Exception:
+                try:
+                    import json_repair
+                    parsed = json_repair.repair_json(clean_str, return_objects=True)
+                except Exception:
+                    pass
+            
+            if isinstance(parsed, dict) and "title" in parsed:
+                t_val = str(parsed.get("title", "")).strip()
+                d_val = str(parsed.get("description", "")).strip()
+                h_val = str(parsed.get("hashtags", "")).strip()
+                caption = f"{t_val}\n\n{d_val}\n\n{h_val}".strip()
+            else:
+                lines = [l.strip() for l in raw_response.splitlines() if l.strip()]
+                if len(lines) >= 3:
+                    title_line = lines[0]
+                    hashtags_line = lines[-1]
+                    desc_lines = " ".join(lines[1:-1])
+                    caption = f"{title_line}\n\n{desc_lines}\n\n{hashtags_line}"
+                else:
+                    caption = generate_smart_fallback(topic)
     except Exception as e:
         print(f"خطأ أثناء توليد الوصف: {e}")
         caption = generate_smart_fallback(topic)
