@@ -81,13 +81,13 @@ CONFIG = load_config()
 
 def generate_voice(text, output_path):
     voice = CONFIG.get("voice", "en-US-GuyNeural - en-US (Male)")
-    print(f"   🎙️ جاري توليد الصوت الواقعي الطبيعي ({voice})...")
+    print(f"   🎙️ جاري توليد صوت الرجل الاحترافي ({voice})...")
     
     # حساب الحد الأدنى المتوقع لزمن الصوت لمنع أي ملفات مقطوعة أو فارغة
     words_count = len(text.split())
     expected_min_sec = max(12.0, words_count * 0.22)
     
-    # 1. محاولة استخدام الصوت العصبي الفائق (Edge-TTS عبر Gradio) مع إعادة المحاولة والتحقق من الاكتمال
+    # 1. محاولة استخدام الصوت العصبي الفائق (Edge-TTS صوت Guy الرجالي)
     for attempt in range(1, 3):
         try:
             from gradio_client import Client
@@ -106,7 +106,7 @@ def generate_voice(text, output_path):
                 audio_check = AudioSegment.from_file(temp_audio)
                 if audio_check.duration_seconds >= expected_min_sec:
                     shutil.copy(temp_audio, output_path)
-                    print(f"   ✓ تم توليد الصوت العصبي فائق الجودة بنجاح ({round(audio_check.duration_seconds, 1)}s)!")
+                    print(f"   ✓ تم توليد صوت الرجل العصبي (Guy) بنجاح ({round(audio_check.duration_seconds, 1)}s)!")
                     return True
                 else:
                     print(f"   ⚠️ تنبيه: الملف الصوتي المستلم مبتور ({round(audio_check.duration_seconds, 1)}s من أصل {words_count} كلمة)، محاولة ثانية...")
@@ -114,18 +114,57 @@ def generate_voice(text, output_path):
             print(f"   ⚠️ محاولة {attempt} للصوت العصبي تعثرت ({e})...")
         time.sleep(1)
 
-    # 2. التراجع الذكي إلى الصوت البديل المؤكد (gTTS) لضمان عدم توقف أو بتر الفيديو إطلاقاً
-    print("   🔄 جاري التحويل الفوري إلى محرك الصوت الاحتياطي المضمون (gTTS)...")
+    # 2. التراجع المباشر إلى صوت الرجل العصبي فائق الجودة والواقعية (Kokoro - Adam/Michael الرجالي) محلياً
+    print("   🎙️ جاري التوليد الفوري عبر محرك الصوت الرجالي الواقعي فائق الدقة (Kokoro Male Voice)...")
     try:
-        from gtts import gTTS
+        import soundfile as sf
+        from kokoro_onnx import Kokoro
         from pydub import AudioSegment
-        tts = gTTS(text=text, lang='en', slow=False)
-        tts.save(output_path)
-        chk = AudioSegment.from_file(output_path)
-        print(f"   ✓ تم توليد الصوت البديل بنجاح كامل ({round(chk.duration_seconds, 1)}s)!")
+        
+        models_dir = os.path.join(os.path.dirname(__file__), "kokoro_models")
+        model_path = os.path.join(models_dir, "kokoro-v0_19.onnx")
+        voices_path = os.path.join(models_dir, "voices.bin")
+        
+        if os.path.exists(model_path) and os.path.exists(voices_path):
+            kokoro = Kokoro(model_path, voices_path)
+            samples, sample_rate = kokoro.create(text, voice="am_adam", speed=1.05, lang="en-us")
+            temp_wav = os.path.join(os.path.dirname(output_path), "temp_male_kokoro.wav")
+            sf.write(temp_wav, samples, sample_rate)
+            a_kokoro = AudioSegment.from_file(temp_wav)
+            a_kokoro.export(output_path, format="mp3")
+            try:
+                os.remove(temp_wav)
+            except:
+                pass
+            print(f"   ✓ تم توليد صوت الرجل الواقعي المتقن (Adam) بنجاح تام ({round(a_kokoro.duration_seconds, 1)}s)!")
+            return True
+    except Exception as e_kokoro:
+        print(f"   ⚠️ تعذر استخدام محرك Kokoro ({e_kokoro})، جاري التراجع إلى صوت David الرجالي...")
+
+    # 3. خط الدفاع الثالث المضمون: صوت David الرجالي من مايكروسوفت (مدمج في الويندوز بدون إنترنت)
+    try:
+        import pyttsx3
+        from pydub import AudioSegment
+        engine = pyttsx3.init()
+        # اختيار صوت David الرجالي
+        for v in engine.getProperty('voices'):
+            if "david" in v.name.lower() or "male" in v.name.lower():
+                engine.setProperty('voice', v.id)
+                break
+        engine.setProperty('rate', 150)
+        temp_wav_david = os.path.join(os.path.dirname(output_path), "temp_male_david.wav")
+        engine.save_to_file(text, temp_wav_david)
+        engine.runAndWait()
+        a_david = AudioSegment.from_file(temp_wav_david)
+        a_david.export(output_path, format="mp3")
+        try:
+            os.remove(temp_wav_david)
+        except:
+            pass
+        print(f"   ✓ تم توليد صوت David الرجالي بنجاح تام ({round(a_david.duration_seconds, 1)}s)!")
         return True
-    except Exception as e2:
-        print(f"خطأ أثناء توليد الصوت الاحتياطي: {e2}")
+    except Exception as e_david:
+        print(f"خطأ أثناء توليد الصوت الاحتياطي: {e_david}")
         return False
 
 # --- 2. دوال الذكاء الاصطناعي (API المحلي) ---
