@@ -840,58 +840,27 @@ def main():
                 hook_name = os.path.basename(selected_hook)
                 print(f"\n🎯 [الهوك البصري]: تم اختيار هوك عشوائي ({hook_name}) للبداية...")
                 try:
-                    # فحص مدة الهوك بدقة كاملة دون أي قص
                     probe_cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", selected_hook]
                     res = subprocess.run(probe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                     hook_dur = float(res.stdout.strip())
                     
-                    # التحقق من وجود مسار صوتي أصلي في مقطع الهوك للحفاظ عليه دون كتم
-                    probe_audio = ["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=codec_type", "-of", "csv=p=0", selected_hook]
-                    res_a = subprocess.run(probe_audio, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                    has_hook_audio = bool(res_a.stdout.strip())
-                    
                     temp_hook_file = os.path.join(workspace, "temp_prepared_hook.mp4")
                     
-                    # تجهيز الهوك مع الحفاظ على صوته الأصلي الطبيعي كاملاً يليه 0.1 ثانية شاشة سوداء صامتة للانتقال السلس
-                    if has_hook_audio:
-                        hook_prep_cmd = [
-                            "ffmpeg", "-y", "-loglevel", "error",
-                            "-i", selected_hook,
-                            "-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=24:d=0.1",
-                            "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo:d=0.1",
-                            "-filter_complex",
-                            f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=24[v0];"
-                            f"[0:a]aresample=44100,aformat=channel_layouts=stereo[a0];"
-                            f"[1:v]setsar=1,fps=24[v_b];"
-                            f"[2:a]aresample=44100,aformat=channel_layouts=stereo[a_b];"
-                            f"[v0][a0][v_b][a_b]concat=n=2:v=1:a=1[v][a]",
-                            "-map", "[v]", "-map", "[a]",
-                            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
-                            "-c:a", "aac", "-b:a", "192k",
-                            temp_hook_file
-                        ]
-                    else:
-                        hook_prep_cmd = [
-                            "ffmpeg", "-y", "-loglevel", "error",
-                            "-i", selected_hook,
-                            "-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=24:d=0.1",
-                            "-f", "lavfi", "-i", f"anullsrc=r=44100:cl=stereo:d={hook_dur:.3f}",
-                            "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo:d=0.1",
-                            "-filter_complex",
-                            f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=24[v0];"
-                            f"[2:a]aresample=44100,aformat=channel_layouts=stereo[a0];"
-                            f"[1:v]setsar=1,fps=24[v_b];"
-                            f"[3:a]aresample=44100,aformat=channel_layouts=stereo[a_b];"
-                            f"[v0][a0][v_b][a_b]concat=n=2:v=1:a=1[v][a]",
-                            "-map", "[v]", "-map", "[a]",
-                            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
-                            "-c:a", "aac", "-b:a", "192k",
-                            temp_hook_file
-                        ]
-                        
+                    # تشغيل فيديو الهوك بصوته الأصلي الطبيعي تماماً دون كتم
+                    hook_prep_cmd = [
+                        "ffmpeg", "-y", "-loglevel", "error",
+                        "-i", selected_hook,
+                        "-filter_complex",
+                        "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=24[v0];"
+                        "[0:a]aresample=44100,aformat=channel_layouts=stereo[a0]",
+                        "-map", "[v0]", "-map", "[a0]",
+                        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
+                        "-c:a", "aac", "-b:a", "192k",
+                        temp_hook_file
+                    ]
                     subprocess.run(hook_prep_cmd, check=True)
                     temp_hook_path = temp_hook_file
-                    print("   ✓ تم تجهيز الهوك بالكامل مع الحفاظ على صوته الأصلي وشاشة الانتقال (0.1s) بنجاح!")
+                    print("   ✓ تم تجهيز الهوك بصوته الأصلي الطبيعي بنجاح!")
                 except Exception as e_hk:
                     print(f"   ⚠️ تعذر تجهيز الهوك البصري ({e_hk})، سيتم تجاوزه.")
 
