@@ -854,19 +854,37 @@ def main():
                     
                     temp_hook_file = os.path.join(workspace, "temp_prepared_hook.mp4")
                     
-                    # تسريع الصوت إلى 1.7 ومزامنته بحيث تنتهي نهاية الصوت مع نهاية الهوك تماماً + 0.1s شاشة سوداء
-                    eff_sound_dur = sound_dur / 1.7 if sound_dur > 0 else 0.0
-                    if sound_dur > 0 and eff_sound_dur >= hook_dur:
-                        sound_start = round((eff_sound_dur - hook_dur) * 1.7, 3)
+                    # تسريع الصوت إلى 1.7 أولاً وضبط نهايته لتتزامن بدقة مطلقة مع نهاية مقطع الهوك
+                    temp_sped_snd = os.path.join(workspace, "temp_snd_17.wav")
+                    sped_dur = 0.0
+                    if os.path.exists(hook_audio_source):
+                        try:
+                            subprocess.run([
+                                "ffmpeg", "-y", "-loglevel", "error",
+                                "-i", hook_audio_source,
+                                "-filter:a", "atempo=1.7",
+                                temp_sped_snd
+                            ], check=True)
+                            p_snd = subprocess.run([
+                                "ffprobe", "-v", "error", "-show_entries", "format=duration",
+                                "-of", "default=noprint_wrappers=1:nokey=1", temp_sped_snd
+                            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                            sped_dur = float(p_snd.stdout.strip())
+                        except Exception:
+                            sped_dur = 0.0
+                    
+                    if sped_dur > 0 and sped_dur >= hook_dur:
+                        # الصوت أطول من الهوك: نأخذ الثواني الأخيرة بحيث تنتهي آخر لحظة من الصوت مع نهاية الهوك
+                        sound_start = round(sped_dur - hook_dur, 3)
                         hook_prep_cmd = [
                             "ffmpeg", "-y", "-loglevel", "error",
                             "-i", selected_hook,
-                            "-ss", f"{sound_start:.3f}", "-i", hook_audio_source,
+                            "-ss", f"{sound_start:.3f}", "-i", temp_sped_snd,
                             "-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=24:d=0.1",
                             "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo:d=0.1",
                             "-filter_complex",
                             f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=24[v0];"
-                            f"[1:a]atempo=1.7,atrim=0:{hook_dur:.3f},asetpts=PTS-STARTPTS,aresample=44100,aformat=channel_layouts=stereo[a0];"
+                            f"[1:a]atrim=0:{hook_dur:.3f},asetpts=PTS-STARTPTS,aresample=44100,aformat=channel_layouts=stereo[a0];"
                             f"[2:v]setsar=1,fps=24[v_b];"
                             f"[3:a]aresample=44100,aformat=channel_layouts=stereo[a_b];"
                             f"[v0][a0][v_b][a_b]concat=n=2:v=1:a=1[v][a]",
@@ -875,17 +893,18 @@ def main():
                             "-c:a", "aac", "-b:a", "192k",
                             temp_hook_file
                         ]
-                    elif sound_dur > 0:
-                        delay_ms = int((hook_dur - eff_sound_dur) * 1000)
+                    elif sped_dur > 0:
+                        # الصوت أقصر من الهوك: تأخير بدايته بحيث تنتهي آخر لحظة منه مع نهاية الهوك بالضبط
+                        delay_ms = int(round((hook_dur - sped_dur) * 1000))
                         hook_prep_cmd = [
                             "ffmpeg", "-y", "-loglevel", "error",
                             "-i", selected_hook,
-                            "-i", hook_audio_source,
+                            "-i", temp_sped_snd,
                             "-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=24:d=0.1",
                             "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo:d=0.1",
                             "-filter_complex",
                             f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=24[v0];"
-                            f"[1:a]atempo=1.7,adelay={delay_ms}|{delay_ms},atrim=0:{hook_dur:.3f},asetpts=PTS-STARTPTS,aresample=44100,aformat=channel_layouts=stereo[a0];"
+                            f"[1:a]adelay={delay_ms}|{delay_ms},atrim=0:{hook_dur:.3f},asetpts=PTS-STARTPTS,aresample=44100,aformat=channel_layouts=stereo[a0];"
                             f"[2:v]setsar=1,fps=24[v_b];"
                             f"[3:a]aresample=44100,aformat=channel_layouts=stereo[a_b];"
                             f"[v0][a0][v_b][a_b]concat=n=2:v=1:a=1[v][a]",
@@ -912,6 +931,11 @@ def main():
                             temp_hook_file
                         ]
                     subprocess.run(hook_prep_cmd, check=True)
+                    try:
+                        if os.path.exists(temp_sped_snd):
+                            os.remove(temp_sped_snd)
+                    except Exception:
+                        pass
                     temp_hook_path = temp_hook_file
                     print("   ✓ تم تجهيز الهوك بالكامل مع مزامنة نهاية الصوت (بسرعة 1.7x) والشاشة السوداء (0.1s) بنجاح!")
                 except Exception as e_hk:
