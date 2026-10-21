@@ -66,7 +66,13 @@ def load_config():
         "api_key": "sk-chatgpt-local-secret-key",
         "bot_token": "8951711275:AAFpZH-GfdFxEMO-oCb4iJQz1eBASYGBdCQ",
         "channel_id": "-1004247712091",
-        "voice": "en-US-GuyNeural - en-US (Male)"
+        "voice": "en-US-GuyNeural - en-US (Male)",
+        "upload_to_telegram": True,
+        "gameplay_path": r"C:\Users\User\OneDrive\Desktop\resilt\document_5936256664112996112.mp4",
+        "hook_dir": r"C:\Users\User\OneDrive\Desktop\resilt\hook",
+        "hook_audio_source": r"C:\Users\User\OneDrive\Desktop\resilt\Am4wYTiHHx8.mp4",
+        "bg_music_path": r"C:\Users\User\OneDrive\Desktop\resilt\_gYjh863j4g.mp4",
+        "outro_path": r"C:\Users\User\OneDrive\Desktop\resilt\6993530118_tk_2x.mp4"
     }
     if os.path.exists(config_path):
         try:
@@ -588,11 +594,9 @@ def main():
         clips = [bg_clip]
 
         # 2. إعداد مقطع الجيم بلاي في النصف السفلي (Y: 960 إلى 1920) بدقة عالية مع اختيار مقطع عشوائي في كل مرة
-        gameplay_candidates = [
-            r"C:\Users\User\OneDrive\Desktop\resilt\document_5936256664112996112.mp4",
-            r"C:\Users\User\OneDrive\Desktop\resilt\videoplayback.mp4"
-        ]
-        gameplay_path = next((p for p in gameplay_candidates if os.path.exists(p)), None)
+        configured_gp = CONFIG.get("gameplay_path", "").strip()
+        gameplay_candidates = [configured_gp, r"C:\Users\User\OneDrive\Desktop\resilt\document_5936256664112996112.mp4", r"C:\Users\User\OneDrive\Desktop\resilt\videoplayback.mp4"]
+        gameplay_path = next((p for p in gameplay_candidates if p and os.path.exists(p)), None)
         if gameplay_path:
             try:
                 import random
@@ -793,7 +797,7 @@ def main():
         video = CompositeVideoClip(clips, size=(1080, 1920))
         
         # 4. دمج صوت الخلفية الموسيقية (يبدأ دائماً من أول الفيديو، ولا يمتد فوق الخاتمة)
-        bg_music_path = r"C:\Users\User\OneDrive\Desktop\resilt\_gYjh863j4g.mp4"
+        bg_music_path = CONFIG.get("bg_music_path", r"C:\Users\User\OneDrive\Desktop\resilt\_gYjh863j4g.mp4")
         if os.path.exists(bg_music_path):
             print("\n   🎵 دمج صوت الخلفية الموسيقية بمستوى متوازن (12%) يبدأ من أول الكليب...")
             try:
@@ -829,9 +833,9 @@ def main():
             pass
 
         # --- دمج الهوك البصري الافتتاحي والخاتمة التلقائية وقص الصمت النهائي ---
-        hook_dir = r"C:\Users\User\OneDrive\Desktop\resilt\hook"
-        hook_audio_source = r"C:\Users\User\OneDrive\Desktop\resilt\Am4wYTiHHx8.mp4"
-        outro_path = r"C:\Users\User\OneDrive\Desktop\resilt\6993530118_tk_2x.mp4"
+        hook_dir = CONFIG.get("hook_dir", r"C:\Users\User\OneDrive\Desktop\resilt\hook")
+        hook_audio_source = CONFIG.get("hook_audio_source", r"C:\Users\User\OneDrive\Desktop\resilt\Am4wYTiHHx8.mp4")
+        outro_path = CONFIG.get("outro_path", r"C:\Users\User\OneDrive\Desktop\resilt\6993530118_tk_2x.mp4")
         
         temp_hook_path = None
         if os.path.exists(hook_dir):
@@ -1011,8 +1015,11 @@ def main():
         print(f"📁 المسار: {final_video_path}")
         print("="*50)
         
-        # استدعاء دالة تيليجرام
-        upload_to_telegram(final_video_path, topic, script)
+        # استدعاء دالة تيليجرام (إذا كان الخيار مفعلاً)
+        if CONFIG.get("upload_to_telegram", True):
+            upload_to_telegram(final_video_path, topic, script)
+        else:
+            print("ℹ️ تم تخطي الرفع إلى تيليجرام بناءً على خيارات الإعدادات.")
         
         os.startfile(final_video_path)
         
