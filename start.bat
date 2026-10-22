@@ -1,7 +1,7 @@
 @echo off
-title AI Shorts Creator - Web Dashboard
+title AI Shorts Creator - License & Launch (v4)
 echo ========================================================
-echo       Starting AI Shorts Creator Dashboard (v3)...
+echo       AI Shorts Creator - Startup & Verification (v4)
 echo ========================================================
 echo.
 
@@ -12,6 +12,17 @@ if errorlevel 1 (
     exit /b
 )
 
+echo Checking License Status...
+python -c "import auth_guard; auth_guard.check_access_or_prompt()"
+
+if errorlevel 1 (
+    echo.
+    echo [ERROR] License validation failed or cancelled.
+    pause
+    exit /b
+)
+
+echo.
 echo Launching web interface...
 start http://127.0.0.1:7860
 python web_gui.py
