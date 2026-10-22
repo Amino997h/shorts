@@ -1,7 +1,9 @@
 @echo off
+chcp 65001 >nul 2>&1
+set PYTHONIOENCODING=utf-8
 title Installing AI Shorts Creator Dependencies...
 echo ========================================================
-echo       AI Shorts Creator - Automatic Setup (v3)
+echo       AI Shorts Creator - Automatic Setup (v4)
 echo ========================================================
 echo.
 
@@ -9,22 +11,33 @@ echo Checking Python installation...
 python --version >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] Python is not installed or not in your PATH!
-    echo Please install Python 3.8+ from https://www.python.org/
+    echo Please install Python 3.12 64-bit from https://www.python.org/
     echo Make sure to check "Add Python to PATH" during installation.
     echo.
     pause
-    exit /b
+    exit /b 1
+)
+
+python -c "import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)" >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Python 3.12 64-bit is required for compiled bytecode!
+    echo Current version:
+    python --version
+    echo Please install Python 3.12 from https://www.python.org/
+    pause
+    exit /b 1
 )
 
 echo.
 echo Installing required Python packages...
-pip install moviepy==1.0.3 faster-whisper edge-tts requests gradio pillow
+pip install moviepy==1.0.3 faster-whisper edge-tts requests gradio pillow gtts pydub kokoro-onnx soundfile pyttsx3 json-repair
 
 if errorlevel 1 (
     echo.
     echo [ERROR] Package installation failed. Please check your internet connection.
     pause
-    exit /b
+    exit /b 1
 )
 
 echo.

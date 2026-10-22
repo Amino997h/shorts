@@ -12,7 +12,10 @@ import time
 from urllib.error import URLError, HTTPError
 from gtts import gTTS
 
-sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 from PIL import Image
 if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = Image.Resampling.LANCZOS
@@ -68,11 +71,11 @@ def load_config():
         "channel_id": "YOUR_TELEGRAM_CHANNEL_ID",
         "voice": "en-US-GuyNeural - en-US (Male)",
         "upload_to_telegram": True,
-        "gameplay_path": r"C:\Users\User\OneDrive\Desktop\resilt\document_5936256664112996112.mp4",
-        "hook_dir": r"C:\Users\User\OneDrive\Desktop\resilt\hook",
-        "hook_audio_source": r"C:\Users\User\OneDrive\Desktop\resilt\Am4wYTiHHx8.mp4",
-        "bg_music_path": r"C:\Users\User\OneDrive\Desktop\resilt\_gYjh863j4g.mp4",
-        "outro_path": r"C:\Users\User\OneDrive\Desktop\resilt\6993530118_tk_2x.mp4"
+        "gameplay_path": "",
+        "hook_dir": "",
+        "hook_audio_source": "",
+        "bg_music_path": "",
+        "outro_path": ""
     }
     if os.path.exists(config_path):
         try:
@@ -431,6 +434,22 @@ def main():
     parser.add_argument("--topic", type=str, default="")
     args, unknown = parser.parse_known_args()
 
+    try:
+        import auth_guard
+        _ag_src = getattr(auth_guard, '__file__', '') or ''
+        if not _ag_src.endswith('.pyc'):
+            print("[SECURITY ERROR] License module tampering detected. Execution blocked.")
+            sys.exit(1)
+        local_data = auth_guard.load_local_license()
+        valid, msg, _ = auth_guard.verify_license(local_data.get("key", ""))
+        if not valid:
+            print(f"\n[AUTH ERROR] License check failed: {msg}")
+            print("[AUTH ERROR] Please activate through start.bat or web interface.")
+            sys.exit(1)
+    except Exception as e_auth:
+        print(f"\n[AUTH ERROR] License verification error: {e_auth}")
+        sys.exit(1)
+
     global_start_time = time.time()
     
     print("\n" + "="*50)
@@ -452,7 +471,8 @@ def main():
     print("\n--- السكريبت ---")
     print(script)
     
-    workspace = os.path.join(r"C:\Users\User\Documents\antigravity\dazzling-curie", "video_workspace")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    workspace = os.path.join(base_dir, "video_workspace")
     os.makedirs(workspace, exist_ok=True)
         
     print("\n[الخطوة 2]: تحويل النص إلى صوت احترافي...")
@@ -607,7 +627,13 @@ def main():
 
         # 2. إعداد مقطع الجيم بلاي في النصف السفلي (Y: 960 إلى 1920) بدقة عالية مع اختيار مقطع عشوائي في كل مرة
         configured_gp = CONFIG.get("gameplay_path", "").strip()
-        gameplay_candidates = [configured_gp, r"C:\Users\User\OneDrive\Desktop\resilt\document_5936256664112996112.mp4", r"C:\Users\User\OneDrive\Desktop\resilt\videoplayback.mp4"]
+        if configured_gp and not os.path.isabs(configured_gp):
+            configured_gp = os.path.join(base_dir, configured_gp)
+        gameplay_candidates = [
+            configured_gp,
+            os.path.join(base_dir, "assets", "gameplay.mp4"),
+            os.path.join(base_dir, "gameplay.mp4")
+        ]
         gameplay_path = next((p for p in gameplay_candidates if p and os.path.exists(p)), None)
         if gameplay_path:
             try:
@@ -809,8 +835,19 @@ def main():
         video = CompositeVideoClip(clips, size=(1080, 1920))
         
         # 4. دمج صوت الخلفية الموسيقية (يبدأ دائماً من أول الفيديو، ولا يمتد فوق الخاتمة)
-        bg_music_path = CONFIG.get("bg_music_path", r"C:\Users\User\OneDrive\Desktop\resilt\_gYjh863j4g.mp4")
-        if os.path.exists(bg_music_path):
+        configured_bg = CONFIG.get("bg_music_path", "").strip()
+        if configured_bg and not os.path.isabs(configured_bg):
+            configured_bg = os.path.join(base_dir, configured_bg)
+        bg_music_path = configured_bg
+        if not bg_music_path or not os.path.exists(bg_music_path):
+            alt_bg = os.path.join(base_dir, "assets", "bg_music.mp4")
+            if not os.path.exists(alt_bg):
+                alt_bg = os.path.join(base_dir, "bg_music.mp4")
+            if os.path.exists(alt_bg):
+                bg_music_path = alt_bg
+            else:
+                bg_music_path = ""
+        if bg_music_path and os.path.exists(bg_music_path):
             print("\n   🎵 دمج صوت الخلفية الموسيقية بمستوى متوازن (12%) يبدأ من أول الكليب...")
             try:
                 bg_music = (
@@ -827,8 +864,12 @@ def main():
         else:
             video = video.set_audio(audio_clip)
         
-        # حفظ النتائج في مسار C:\Users\User\OneDrive\Desktop\resilt\ai
-        output_dir = r"C:\Users\User\OneDrive\Desktop\resilt\ai"
+        # حفظ النتائج في مجلد output
+        output_dir = CONFIG.get("output_dir", "").strip()
+        if not output_dir:
+            output_dir = os.path.join(base_dir, "output")
+        elif not os.path.isabs(output_dir):
+            output_dir = os.path.join(base_dir, output_dir)
         os.makedirs(output_dir, exist_ok=True)
         clean_topic = re.sub(r'[\\/*?:"<>|]', "", topic).strip() or "video"
         final_video_path = os.path.join(output_dir, f"{clean_topic}.mp4")
@@ -845,9 +886,19 @@ def main():
             pass
 
         # --- دمج الهوك البصري الافتتاحي والخاتمة التلقائية وقص الصمت النهائي ---
-        hook_dir = CONFIG.get("hook_dir", r"C:\Users\User\OneDrive\Desktop\resilt\hook")
-        hook_audio_source = CONFIG.get("hook_audio_source", r"C:\Users\User\OneDrive\Desktop\resilt\Am4wYTiHHx8.mp4")
-        outro_path = CONFIG.get("outro_path", r"C:\Users\User\OneDrive\Desktop\resilt\6993530118_tk_2x.mp4")
+        hook_dir = CONFIG.get("hook_dir", "").strip()
+        if hook_dir and not os.path.isabs(hook_dir):
+            hook_dir = os.path.join(base_dir, hook_dir)
+        if not hook_dir:
+            hook_dir = os.path.join(base_dir, "assets", "hook")
+
+        hook_audio_source = CONFIG.get("hook_audio_source", "").strip()
+        if hook_audio_source and not os.path.isabs(hook_audio_source):
+            hook_audio_source = os.path.join(base_dir, hook_audio_source)
+
+        outro_path = CONFIG.get("outro_path", "").strip()
+        if outro_path and not os.path.isabs(outro_path):
+            outro_path = os.path.join(base_dir, outro_path)
         
         temp_hook_path = None
         if os.path.exists(hook_dir):

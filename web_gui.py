@@ -1,7 +1,12 @@
+import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 import gradio as gr
 import subprocess
 import os
-import sys
 import json
 import time
 import shutil
@@ -9,7 +14,8 @@ import shutil
 CONFIG_FILE = 'config.json'
 STATE_FILE = 'state.json'
 
-DEFAULT_ASSETS_DIR = r"C:\Users\User\OneDrive\Desktop\resilt"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 DEFAULT_HOOKS_DIR = os.path.join(DEFAULT_ASSETS_DIR, "hook")
 
 def load_config():
@@ -20,11 +26,11 @@ def load_config():
         "channel_id": "YOUR_TELEGRAM_CHANNEL_ID",
         "upload_to_telegram": True,
         "voice": "en-US-GuyNeural - en-US (Male)",
-        "gameplay_path": r"C:\Users\User\OneDrive\Desktop\resilt\document_5936256664112996112.mp4",
-        "hook_dir": r"C:\Users\User\OneDrive\Desktop\resilt\hook",
-        "hook_audio_source": r"C:\Users\User\OneDrive\Desktop\resilt\Am4wYTiHHx8.mp4",
-        "bg_music_path": r"C:\Users\User\OneDrive\Desktop\resilt\_gYjh863j4g.mp4",
-        "outro_path": r"C:\Users\User\OneDrive\Desktop\resilt\6993530118_tk_2x.mp4"
+        "gameplay_path": "",
+        "hook_dir": "",
+        "hook_audio_source": "",
+        "bg_music_path": "",
+        "outro_path": ""
     }
     if os.path.exists(CONFIG_FILE):
         try:
@@ -52,12 +58,18 @@ def validate_config():
             errors.append("مُعرّف القناة في تيليجرام غير محدد مع تفعيل خيار النشر")
             
     gp = cfg.get("gameplay_path", "").strip()
-    if gp and not os.path.exists(gp):
-        errors.append(f"ملف الجيم بلاي المحدد غير موجود: {gp}")
+    if gp:
+        if not os.path.isabs(gp):
+            gp = os.path.join(BASE_DIR, gp)
+        if not os.path.exists(gp):
+            errors.append(f"ملف الجيم بلاي المحدد غير موجود: {gp}")
         
     hk = cfg.get("hook_dir", "").strip()
-    if hk and not os.path.exists(hk):
-        errors.append(f"مجلد الهوكات المحدد غير موجود: {hk}")
+    if hk:
+        if not os.path.isabs(hk):
+            hk = os.path.join(BASE_DIR, hk)
+        if not os.path.exists(hk):
+            errors.append(f"مجلد الهوكات المحدد غير موجود: {hk}")
         
     return errors
 
@@ -258,8 +270,11 @@ def execute_topic(topic, current_num, total_num, prefix=""):
     yield status_text
     
     try:
+        vm_pyc = os.path.join(BASE_DIR, "video_maker.pyc")
+        vm_target = vm_pyc if os.path.exists(vm_pyc) else os.path.join(BASE_DIR, "video_maker.py")
+
         process = subprocess.Popen(
-            ['python', '-u', 'video_maker.py', '--topic', topic],
+            [sys.executable, '-u', vm_target, '--topic', topic],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -268,8 +283,11 @@ def execute_topic(topic, current_num, total_num, prefix=""):
         )
         
         for line in iter(process.stdout.readline, ''):
-            sys.stdout.write(line)
-            sys.stdout.flush()
+            try:
+                sys.stdout.write(line)
+                sys.stdout.flush()
+            except Exception:
+                pass
             
             line_stripped = line.strip()
             
@@ -660,5 +678,9 @@ with gr.Blocks(title="🎬 صانع الفيديوهات الآلي - v3", theme
 
 if __name__ == "__main__":
     import auth_guard
+    _ag_src = getattr(auth_guard, '__file__', '') or ''
+    if not _ag_src.endswith('.pyc'):
+        print("[SECURITY ERROR] License module tampering detected. Execution blocked.")
+        sys.exit(1)
     auth_guard.check_access_or_prompt()
     demo.launch(inbrowser=True, server_name="127.0.0.1", server_port=7860)

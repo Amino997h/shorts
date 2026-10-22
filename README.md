@@ -26,16 +26,16 @@ This tool completely automates the production pipeline for short-form video crea
 ## 🛠️ Installation & Setup
 
 ### 1. Prerequisites
-- **Python 3.8+** (Python 3.10 or 3.11 recommended).
+- **Python 3.12 (64-bit)** (Required for compiled bytecode runtime).
 - **FFmpeg** installed and accessible in your system's `PATH`.
 
 ### 2. Quick Installation (One-Click Setup)
 If you are on Windows, simply double-click:
-- **`install.bat`**: Automatically checks for Python, installs all required packages, and checks for FFmpeg.
+- **`install.bat`**: Automatically checks for Python 3.12, installs all required packages, and checks for FFmpeg.
 
 Or install manually using your terminal:
 ```bash
-pip install moviepy==1.0.3 faster-whisper edge-tts requests gradio pillow
+pip install moviepy==1.0.3 faster-whisper edge-tts requests gradio pillow gtts pydub kokoro-onnx soundfile pyttsx3 json-repair
 ```
 
 > [!NOTE]
@@ -75,7 +75,7 @@ Simply double-click:
 ### 2. Modern Web GUI (Manual)
 Launch the compact dashboard from the terminal:
 ```bash
-python web_gui.py
+python web_gui.pyc
 ```
 Open your browser and navigate to: `http://127.0.0.1:7860`
 
@@ -85,13 +85,13 @@ Open your browser and navigate to: `http://127.0.0.1:7860`
 Generate a video directly for a specific topic:
 
 ```bash
-python video_maker.py --topic "The Mystery of the Bermuda Triangle"
+python video_maker.pyc --topic "The Mystery of the Bermuda Triangle"
 ```
 
 Or batch-generate videos using a playlist JSON file:
 
 ```bash
-python video_maker.py --playlist topics.json
+python video_maker.pyc --playlist topics.json
 ```
 
 ---

@@ -5,9 +5,9 @@
     "channel_id": "YOUR_TELEGRAM_CHANNEL_ID",
     "upload_to_telegram": false,
     "voice": "en-US-GuyNeural - en-US (Male)",
-    "gameplay_path": "assets/gameplay.mp4",
-    "hook_dir": "assets/hook",
-    "hook_audio_source": "assets/hook_audio.mp4",
-    "bg_music_path": "assets/bg_music.mp4",
-    "outro_path": "assets/outro.mp4"
+    "gameplay_path": "",
+    "hook_dir": "",
+    "hook_audio_source": "",
+    "bg_music_path": "",
+    "outro_path": ""
 }
