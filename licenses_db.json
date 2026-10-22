@@ -1,0 +1,30 @@
+{
+    "AMINE-VIP-2026": {
+        "name": "Amine (Owner)",
+        "contact": "@amine_tg",
+        "status": "active",
+        "expires_at": "2027-12-31",
+        "hwid": ""
+    },
+    "CLIENT-TEST-30DAYS": {
+        "name": "Test Client",
+        "contact": "+213555000000",
+        "status": "active",
+        "expires_at": "2026-11-22",
+        "hwid": ""
+    },
+    "EXPIRED-USER-DEMO": {
+        "name": "Demo Expired",
+        "contact": "none",
+        "status": "active",
+        "expires_at": "2024-01-01",
+        "hwid": ""
+    },
+    "BLOCKED-USER-DEMO": {
+        "name": "Hacker Try",
+        "contact": "none",
+        "status": "blocked",
+        "expires_at": "2026-12-31",
+        "hwid": ""
+    }
+}

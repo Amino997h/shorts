@@ -659,4 +659,6 @@ with gr.Blocks(title="🎬 صانع الفيديوهات الآلي - v3", theme
     save_api_btn.click(fn=do_save, inputs=all_inputs, outputs=save_api_status)
 
 if __name__ == "__main__":
+    import auth_guard
+    auth_guard.check_access_or_prompt()
     demo.launch(inbrowser=True, server_name="127.0.0.1", server_port=7860)
