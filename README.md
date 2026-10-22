@@ -1,48 +1,49 @@
 # Automated AI Shorts & Video Creator 🎬 (v3)
 
-نظام متكامل ومؤتمت بالكامل لصناعة مقاطع الفيديو القصيرة (YouTube Shorts / TikTok / Reels) بجودة عالية وبشكل فوري بالذكاء الاصطناعي، بدءاً من كتابة السكربت وحتى التصدير والنشر.
+An end-to-end automated system designed to create high-retention, high-quality vertical short videos (YouTube Shorts, TikTok, Instagram Reels) directly from a prompt using AI—covering scriptwriting, neural voiceovers, dynamic captions, editing, and instant publishing.
 
 ---
 
-## 🌟 الوصف (Description)
+## 🌟 Overview & Key Features
 
-هذا المشروع يوفر حلاً شاملاً وسريعاً لإنشاء مقاطع فيديو عمودية (9:16) جاهزة للنشر تلقائياً:
-1. **توليد السكربت الذكي (AI Scripting):** يتصل بالذكاء الاصطناعي (Local ChatGPT / OpenAI API) لصياغة قصة مشوقة ومقسمة إلى مشاهد محددة مع كلمات مفتاحية دقيقة للصور.
-2. **التعليق الصوتي الاحترافي (Edge TTS):** تحويل النص إلى صوت طبيعي بجودة استوديو باستخدام أصوات Microsoft Edge العصبية (Neural Voices) مثل `GuyNeural`.
-3. **تحميل الصور بالتوازي (Fast Parallel Image Fetching):** تنزيل أحدث الصور المناسبة لكل مشهد بشكل متوازٍ (`ThreadPoolExecutor`) لتوفير الوقت.
-4. **تزامن الكلمات والترجمة الحركية (Faster-Whisper):** استخراج التوقيت الدقيق لكل كلمة وعرض ترجمة سينمائية متحركة على الشاشة بألوان وخطوط جذابة.
-5. **مونتاج الفيديو والمؤثرات (MoviePy & FFmpeg):**
-   - دمج خلفية ألعاب (Gameplay Background) بالأسفل مع مقاطع أو صور القصة بالأعلى.
-   - إضافة هوك جذب انتباه في البداية (Hook Overlay).
-   - موسيقى خلفية هادئة متناسقة.
-   - خاتمة احترافية سريعة مع زر الاشتراك مع قص الصمت الميت في نهاية الكلام تلقائياً.
-6. **معالجة فائقة السرعة (High-Speed Multi-threading):** تصيير الفيديو باستخدام 8 مسارات معالجة وتسريع Whisper لتوليد الفيديو في وقت قياسي.
-7. **واجهة تحكم ويب عصرية (Modern Compact Web GUI):** واجهة مدمجة ومريحة (Dashboard) تعمل من المتصفح للتحكم في الإعدادات والمواضيع والأصوات بكل سهولة.
-8. **النشر التلقائي (Telegram Auto-Upload):** رفع الفيديو النهائي إلى قنوات تيليجرام فور اكتماله مع وصف مناسب وهاشتاغات.
+This tool completely automates the production pipeline for short-form video creation:
+
+1. **AI Script Generation**: Connects to an OpenAI-compatible API (e.g., local ChatGPT/LLMs) to craft engaging, suspenseful scripts split into synchronized visual scenes with tailored search keywords.
+2. **Studio-Quality Voiceover (Edge TTS)**: Synthesizes ultra-realistic, natural voiceovers using Microsoft Edge Neural Voices (e.g., `GuyNeural`).
+3. **High-Speed Parallel Image Fetching**: Downloads the most relevant, high-resolution scene imagery simultaneously using multi-threaded execution (`ThreadPoolExecutor`).
+4. **Animated Word-by-Word Subtitles (Faster-Whisper)**: Extracts high-precision word timestamps and burns stylized, high-contrast dynamic subtitles with highlighted keywords into the frame.
+5. **Advanced Video Composition (MoviePy & FFmpeg)**:
+   - Splits screen dynamically: top section displays the story visual/slideshow, bottom section loops HD gameplay footage.
+   - Attention-grabbing visual hook overlay at the beginning.
+   - Low-volume atmospheric background music seamlessly mixed beneath the narration.
+   - Smart Outro: dynamically trims end-of-speech dead silence and stitches a high-energy subscribe call-to-action video.
+6. **Blazing Fast Multi-threaded Rendering**: Optimizes CPU usage with 8-threaded video encoding (`preset="veryfast"`) and multi-core Whisper indexing for lightning-fast turnaround.
+7. **Modern Compact Web GUI**: Clean, single-page dashboard built with Gradio—manage voice styles, topics, credentials, and video assets without scrolling.
+8. **Automated Telegram Publishing**: Automatically generates engaging English descriptions, trending hashtags, and pushes finished videos directly to your Telegram channel.
 
 ---
 
-## 🛠️ متطلبات التثبيت (Installation)
+## 🛠️ Installation & Setup
 
-### 1. المتطلبات الأساسية
-- مثبت لغة **Python 3.8** أو أعلى (يوصى بـ Python 3.10 أو 3.11).
-- برنامج **FFmpeg** مثبت ومضاف إلى متغيرات البيئة (PATH).
+### 1. Prerequisites
+- **Python 3.8+** (Python 3.10 or 3.11 recommended).
+- **FFmpeg** installed and accessible in your system's `PATH`.
 
-### 2. تثبيت الحزم المطلوبة
-افتح موجه الأوامر (Terminal / CMD / PowerShell) داخل مجلد المشروع، وقم بتثبيت المكتبات التالية:
+### 2. Install Required Dependencies
+Open your terminal (PowerShell, Command Prompt, or Bash) in the project directory and run:
 
 ```bash
 pip install moviepy==1.0.3 faster-whisper edge-tts requests gradio pillow
 ```
 
 > [!NOTE]
-> تأكد من تثبيت `moviepy==1.0.3` لتوافق التأثيرات الصوتية ومسارات المونتاج.
+> Ensure you install `moviepy==1.0.3` to maintain full compatibility with the audio filters and composite video FX.
 
 ---
 
-## ⚙️ الإعدادات (Configuration)
+## ⚙️ Configuration
 
-يحتوي المشروع على ملف `config.json` يحتوي على مسارات الموارد وإعدادات الذكاء الاصطناعي والتيليجرام:
+The project uses `config.json` to store your local AI endpoints, Telegram credentials, voice settings, and media paths:
 
 ```json
 {
@@ -61,32 +62,39 @@ pip install moviepy==1.0.3 faster-whisper edge-tts requests gradio pillow
 
 ---
 
-## 🚀 طريقة الاستعمال (Usage)
+## 🚀 How to Use
 
-يمكنك تشغيل المشروع بطريقتين:
+You can run the generator via the Web Dashboard or directly from the Command Line.
 
-### 1. عبر واجهة الويب (Web GUI) - الطريقة الموصى بها
-واجهة سهلة ومدمجة بدون الحاجة للتمرير، تتيح لك كتابة المواضيع، واختيار الأصوات، وتغيير الإعدادات بنقرة زر:
+### 1. Modern Web GUI (Recommended)
+Launch the compact dashboard to configure settings, select voices, and generate videos with a single click:
+
 ```bash
 python web_gui.py
 ```
-ثم افتح الرابط في المتصفح: `http://127.0.0.1:7860`
+Open your browser and navigate to: `http://127.0.0.1:7860`
 
 ---
 
-### 2. عبر سطر الأوامر (Command Line)
-يمكنك إنشاء فيديو مباشر بتحديد الموضوع:
+### 2. Command Line Interface (CLI)
+Generate a video directly for a specific topic:
+
 ```bash
-python video_maker.py --topic "The Secret of the Bermuda Triangle"
+python video_maker.py --topic "The Mystery of the Bermuda Triangle"
 ```
 
-أو المعالجة بالدفعات (Batch Mode) باستخدام ملف نصي أو قائمة مواضيع:
+Or batch-generate videos using a playlist JSON file:
+
 ```bash
 python video_maker.py --playlist topics.json
 ```
 
 ---
 
-## 📁 هيكلية المخرجات
-- يتم حفظ المشاريع المنشأة في مجلد `video_workspace/`.
-- يحتوي كل مشروع على السكربت، الصوت المستخرج، الصور المجمعة، وملف الفيديو النهائي `final_video.mp4`.
+## 📁 Output Structure
+
+All generated projects are stored inside the `video_workspace/` directory:
+- Generated script text file
+- Voiceover audio (`.mp3`)
+- Synchronized scene images
+- Final rendered video (`final_video.mp4`)
