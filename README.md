@@ -29,9 +29,11 @@ This tool completely automates the production pipeline for short-form video crea
 - **Python 3.8+** (Python 3.10 or 3.11 recommended).
 - **FFmpeg** installed and accessible in your system's `PATH`.
 
-### 2. Install Required Dependencies
-Open your terminal (PowerShell, Command Prompt, or Bash) in the project directory and run:
+### 2. Quick Installation (One-Click Setup)
+If you are on Windows, simply double-click:
+- **`install.bat`**: Automatically checks for Python, installs all required packages, and checks for FFmpeg.
 
+Or install manually using your terminal:
 ```bash
 pip install moviepy==1.0.3 faster-whisper edge-tts requests gradio pillow
 ```
@@ -64,11 +66,14 @@ The project uses `config.json` to store your local AI endpoints, Telegram creden
 
 ## 🚀 How to Use
 
-You can run the generator via the Web Dashboard or directly from the Command Line.
+You can run the generator via One-Click Launcher, Web Dashboard, or Command Line.
 
-### 1. Modern Web GUI (Recommended)
-Launch the compact dashboard to configure settings, select voices, and generate videos with a single click:
+### 1. One-Click Launcher (Windows)
+Simply double-click:
+- **`start.bat`**: Automatically launches the dashboard and opens `http://127.0.0.1:7860` in your default browser.
 
+### 2. Modern Web GUI (Manual)
+Launch the compact dashboard from the terminal:
 ```bash
 python web_gui.py
 ```
@@ -76,7 +81,7 @@ Open your browser and navigate to: `http://127.0.0.1:7860`
 
 ---
 
-### 2. Command Line Interface (CLI)
+### 3. Command Line Interface (CLI)
 Generate a video directly for a specific topic:
 
 ```bash
