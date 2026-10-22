@@ -1,13 +1,13 @@
 {
     "api_url": "http://127.0.0.1:8008/v1/chat/completions",
-    "api_key": "sk-chatgpt-local-secret-key",
-    "bot_token": "8951711275:AAFpZH-GfdFxEMO-oCb4iJQz1eBASYGBdCQ",
-    "channel_id": "-1004247712091",
-    "upload_to_telegram": true,
+    "api_key": "YOUR_API_KEY_HERE",
+    "bot_token": "YOUR_TELEGRAM_BOT_TOKEN",
+    "channel_id": "YOUR_TELEGRAM_CHANNEL_ID",
+    "upload_to_telegram": false,
     "voice": "en-US-GuyNeural - en-US (Male)",
-    "gameplay_path": "C:\\Users\\User\\OneDrive\\Desktop\\resilt\\document_5936256664112996112.mp4",
-    "hook_dir": "C:\\Users\\User\\OneDrive\\Desktop\\resilt\\hook",
-    "hook_audio_source": "C:\\Users\\User\\OneDrive\\Desktop\\resilt\\Am4wYTiHHx8.mp4",
-    "bg_music_path": "C:\\Users\\User\\OneDrive\\Desktop\\resilt\\_gYjh863j4g.mp4",
-    "outro_path": "C:\\Users\\User\\OneDrive\\Desktop\\resilt\\6993530118_tk_2x.mp4"
+    "gameplay_path": "assets/gameplay.mp4",
+    "hook_dir": "assets/hook",
+    "hook_audio_source": "assets/hook_audio.mp4",
+    "bg_music_path": "assets/bg_music.mp4",
+    "outro_path": "assets/outro.mp4"
 }
