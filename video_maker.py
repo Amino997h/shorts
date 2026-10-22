@@ -468,8 +468,8 @@ def main():
     speech_end_time = None
     try:
         from faster_whisper import WhisperModel
-        # نستخدم موديل صغير للسرعة
-        model = WhisperModel("tiny", device="cpu", compute_type="int8")
+        # نستخدم موديل صغير للسرعة مع استغلال أنوية المعالج للتسريع
+        model = WhisperModel("tiny", device="cpu", compute_type="int8", cpu_threads=4, num_workers=2)
         segments_iter, info = model.transcribe(audio_path, language="en", word_timestamps=True)
         
         words_list = []
@@ -552,10 +552,13 @@ def main():
     image_plan = get_image_timings_from_segments(lite_segments)
     if not image_plan: return
     
-    print("\n[الخطوة 5]: تحميل الصور بناءً على التوقيت...")
+    print("\n[الخطوة 5]: تحميل الصور بناءً على التوقيت (بالتوازي الفائق)...")
     downloaded_clips_info = []
     
-    for i, plan in enumerate(image_plan):
+    from concurrent.futures import ThreadPoolExecutor
+    
+    def fetch_image_for_plan(idx_and_plan):
+        i, plan = idx_and_plan
         kw = plan['keyword']
         start_t = plan['start']
         end_t = plan['end']
@@ -567,14 +570,23 @@ def main():
             for url in urls[:5]:
                 img_path = os.path.join(workspace, f"img_{i}.jpg")
                 if download_image(url, img_path):
-                    downloaded_clips_info.append({
+                    print(f"✓ تم تحميل: {kw}")
+                    return {
                         "path": img_path,
                         "start": start_t,
                         "end": end_t,
-                        "duration": duration
-                    })
-                    print(f"✓ تم التحميل.")
-                    break
+                        "duration": duration,
+                        "index": i
+                    }
+        return None
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        results = list(executor.map(fetch_image_for_plan, enumerate(image_plan)))
+        
+    downloaded_clips_info = [r for r in results if r is not None]
+    downloaded_clips_info.sort(key=lambda x: x["index"])
+    for item in downloaded_clips_info:
+        item.pop("index", None)
                     
     if not downloaded_clips_info:
         print("فشل تحميل أي صورة.")
@@ -825,7 +837,7 @@ def main():
             final_video_path = os.path.join(output_dir, f"{clean_topic}_{counter}.mp4")
             counter += 1
         print("\n⏳ جاري تصدير الفيديو (الرجاء الانتظار، قد يستغرق بعض الوقت بناءً على قوة جهازك)...")
-        video.write_videofile(final_video_path, fps=24, codec="libx264", audio_codec="aac", bitrate="4500k", preset="fast")
+        video.write_videofile(final_video_path, fps=24, codec="libx264", audio_codec="aac", bitrate="4500k", preset="veryfast", threads=8)
         try:
             video.close()
             audio_clip.close()
