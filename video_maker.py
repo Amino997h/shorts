@@ -64,8 +64,8 @@ def load_config():
     default_config = {
         "api_url": "http://127.0.0.1:8008/v1/chat/completions",
         "api_key": "sk-chatgpt-local-secret-key",
-        "bot_token": "8951711275:AAFpZH-GfdFxEMO-oCb4iJQz1eBASYGBdCQ",
-        "channel_id": "-1004247712091",
+        "bot_token": "YOUR_TELEGRAM_BOT_TOKEN",
+        "channel_id": "YOUR_TELEGRAM_CHANNEL_ID",
         "voice": "en-US-GuyNeural - en-US (Male)",
         "upload_to_telegram": True,
         "gameplay_path": r"C:\Users\User\OneDrive\Desktop\resilt\document_5936256664112996112.mp4",

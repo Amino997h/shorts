@@ -16,8 +16,8 @@ def load_config():
     default_config = {
         "api_url": "http://127.0.0.1:8008/v1/chat/completions",
         "api_key": "sk-chatgpt-local-secret-key",
-        "bot_token": "8951711275:AAFpZH-GfdFxEMO-oCb4iJQz1eBASYGBdCQ",
-        "channel_id": "-1004247712091",
+        "bot_token": "YOUR_TELEGRAM_BOT_TOKEN",
+        "channel_id": "YOUR_TELEGRAM_CHANNEL_ID",
         "upload_to_telegram": True,
         "voice": "en-US-GuyNeural - en-US (Male)",
         "gameplay_path": r"C:\Users\User\OneDrive\Desktop\resilt\document_5936256664112996112.mp4",
@@ -629,14 +629,14 @@ with gr.Blocks(title="🎬 صانع الفيديوهات الآلي - v3", theme
                         label="توكن بوت تيليجرام (Bot Token)",
                         value=current_config.get("bot_token", ""),
                         type="password",
-                        placeholder="8951711275:AAFpZH-GfdFxEMO-oCb4iJQz1eBASYGBdCQ",
+                        placeholder="YOUR_TELEGRAM_BOT_TOKEN",
                         lines=1,
                         elem_classes=["compact-field"]
                     )
                     channel_id_input = gr.Textbox(
                         label="مُعرّف القناة (Channel ID)",
                         value=current_config.get("channel_id", ""),
-                        placeholder="-1004247712091",
+                        placeholder="YOUR_TELEGRAM_CHANNEL_ID",
                         lines=1,
                         elem_classes=["compact-field"]
                     )
