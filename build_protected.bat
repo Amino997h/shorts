@@ -1,31 +1,43 @@
 @echo off
-title Obfuscating AI Shorts Creator (v4)...
+title Creating Client Protected Package (v4)...
 echo ========================================================
-echo       Building Protected Release with PyArmor (v4)
+echo       Generating Protected Client Package (v4)
 echo ========================================================
 echo.
 
-echo 1. Cleaning previous dist folder...
+set RELEASE_DIR=AI_Shorts_Client_Release
+
+echo 1. Cleaning old release folder...
+if exist "%RELEASE_DIR%" rd /s /q "%RELEASE_DIR%"
 if exist dist rd /s /q dist
 
-echo 2. Obfuscating core license module...
+echo 2. Obfuscating core security module (auth_guard.py)...
 pyarmor gen auth_guard.py
 
-echo.
-echo 3. Copying protected runtime to root...
-if exist dist\pyarmor_runtime_000000 (
-    xcopy /E /I /Y dist\pyarmor_runtime_000000 pyarmor_runtime_000000 >nul
-    copy /Y dist\auth_guard.py auth_guard.py >nul
-    echo [OK] Core authorization module is now fully encrypted!
-) else (
-    echo [ERROR] Obfuscation failed!
+if errorlevel 1 (
+    echo [ERROR] PyArmor obfuscation failed!
     pause
     exit /b
 )
 
 echo.
+echo 3. Creating client release folder: %RELEASE_DIR%...
+mkdir "%RELEASE_DIR%"
+
+echo 4. Copying protected auth_guard and pyarmor security runtime...
+xcopy /E /I /Y dist\* "%RELEASE_DIR%\" >nul
+
+echo 5. Copying application scripts and assets...
+copy /Y web_gui.py "%RELEASE_DIR%\" >nul
+copy /Y video_maker.py "%RELEASE_DIR%\" >nul
+copy /Y install.bat "%RELEASE_DIR%\" >nul
+copy /Y start.bat "%RELEASE_DIR%\" >nul
+copy /Y config.json "%RELEASE_DIR%\" >nul
+
+echo.
 echo ========================================================
-echo   Protection Completed! auth_guard.py is now encrypted.
+echo   SUCCESS! The client package is ready in:
+echo   %RELEASE_DIR%
 echo ========================================================
 echo.
 pause
