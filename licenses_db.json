@@ -10,7 +10,7 @@
         "name": "Test Client",
         "contact": "+213555000000",
         "status": "active",
-        "expires_at": "2025-11-22",
+        "expires_at": "2027-11-22",
         "hwid": ""
     },
     "EXPIRED-USER-DEMO": {
