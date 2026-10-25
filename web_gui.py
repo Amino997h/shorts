@@ -164,7 +164,7 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
             formatted_logs.append(f'<p><span class="text-yellow-400 font-bold">BATCH_INIT</span> <span class="text-slate-300">{safe_line.replace("BATCH_INIT", "").replace("EXECUTE:", "").strip()}</span></p>')
         elif "[الخطوة 1]" in line_clean or "كتابة السكربت" in line_clean or "API_POST" in line_clean:
             formatted_logs.append(f'<p><span class="text-emerald-300 font-bold">API_POST</span> <span class="text-emerald-400">{safe_line}</span></p>')
-        elif "تم توليد السكربت" in line_clean or "SCRIPT_200" in line_clean:
+        elif "تم توليد السكربت" in line_clean or "SCRIPT_200" in line_clean or "--- السكريبت ---" in line_clean:
             formatted_logs.append(f'<p><span class="text-emerald-400 font-bold">SCRIPT_200</span> <span class="text-emerald-300">{safe_line}</span></p>')
         elif "[الخطوة 2]" in line_clean or "توليد الصوت" in line_clean or "EDGE_TTS" in line_clean:
             formatted_logs.append(f'<p><span class="text-yellow-400 font-bold">EDGE_TTS</span> <span class="text-yellow-300">{safe_line}</span></p>')
@@ -172,9 +172,9 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
             formatted_logs.append(f'<p><span class="text-cyan-400 font-bold">WHISPER_SYNC</span> <span class="text-cyan-300">{safe_line}</span></p>')
         elif "جاري البحث عن:" in line_clean or "BING" in line_clean:
             formatted_logs.append(f'<p><span class="text-emerald-300 font-bold">BING_QUERY</span> <span class="text-emerald-200">{safe_line}</span></p>')
-        elif "IMG_200" in line_clean or "تم تنزيل وتدقيق" in line_clean or "[الخطوة 5]" in line_clean:
+        elif "IMG_200" in line_clean or "تم تنزيل وتدقيق" in line_clean or "تم تحميل:" in line_clean or "[الخطوة 5]" in line_clean:
             formatted_logs.append(f'<p><span class="text-emerald-400 font-bold">IMG_200</span> <span class="text-emerald-300">{safe_line}</span></p>')
-        elif "[الخطوة 6]" in line_clean or "المونتاج" in line_clean or "COMPOSITOR" in line_clean:
+        elif "[الخطوة 6]" in line_clean or "المونتاج" in line_clean or "COMPOSITOR" in line_clean or "Rendering" in line_clean:
             formatted_logs.append(f'<p><span class="text-purple-400 font-bold">COMPOSITOR</span> <span class="text-purple-300">{safe_line}</span></p>')
         elif "✓" in line_clean or "تم إنتاج الفيديو" in line_clean or "SUCCESS" in line_clean:
             formatted_logs.append(f'<p><span class="text-emerald-400 font-bold">[OK]</span> <span class="text-emerald-300">{safe_line}</span></p>')
@@ -244,7 +244,7 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
 
         # نصوص الصندوقين مطابقة 100% للبريفيو المعتمد
         spiral_top_tag = f"ACTIVE_WORKER [#{b_curr}]"
-        spiral_center_badge = f'<span class="z-10 text-emerald-300 font-black text-sm font-mono tracking-widest">#{b_curr}</span>'
+        spiral_center_badge = f'<span class="z-10 text-emerald-300 font-black text-xl font-mono tracking-widest">#{b_curr}</span>'
         spiral_status_bottom = f'<span class="text-[10px] text-emerald-600 mt-0.5">[STATUS: {substep_token}]</span>'
 
         term_head_left = f'<span class="font-bold text-emerald-400">BATCH_QUEUE: [{b_curr}/{b_total} VIDEOS]</span>'
@@ -518,7 +518,10 @@ def execute_topic_stream(topic, current_num, total_num, mode="single", batch_inf
             current_pct = 100
             current_step = "اكتمل بنجاح!"
             status_t = "active"
-            log_buffer.append("SUCCESS: Video render and pipeline completed cleanly.")
+            if mode == "batch":
+                log_buffer.append(f"BATCH_SUCCESS [{current_num}/{total_num}] '{topic}' exported cleanly")
+            else:
+                log_buffer.append("SUCCESS: Video render and pipeline completed cleanly.")
         else:
             status_t = "error"
             current_step = f"خطأ في التنفيذ (كود {process.returncode})"
@@ -809,7 +812,13 @@ with gr.Blocks(title="🎬 صانع الفيديوهات الآلي - v4", theme
                     batch_start_btn = gr.Button("🚀 إنتاج القائمة كاملة", variant="primary", scale=1, elem_classes=["btn-primary-action"])
                 
             batch_output_log = gr.HTML(
-                value=render_dashboard_html(mode="batch", percentage=0, step_title="جاهز للبدء", topic="بانتظار تحميل القائمة...")
+                value=render_dashboard_html(
+                    mode="batch",
+                    percentage=0,
+                    step_title="جاهز للبدء",
+                    topic="بانتظار تحميل القائمة...",
+                    batch_info={"pct": 0.0, "completed": 0, "current": 1, "remaining": 0, "avg_sec": "--"}
+                )
             )
             
             batch_start_btn.click(fn=run_batch_topics, inputs=json_file_input, outputs=batch_output_log)
