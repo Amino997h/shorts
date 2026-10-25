@@ -1,4 +1,5 @@
 {
+    "ui_language": "en",
     "api_url": "http://127.0.0.1:8008/v1/chat/completions",
     "api_key": "YOUR_API_KEY_HERE",
     "bot_token": "YOUR_TELEGRAM_BOT_TOKEN",
