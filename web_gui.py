@@ -6,6 +6,7 @@ import json
 import time
 import shutil
 import html
+import re
 from collections import deque
 from datetime import datetime
 
@@ -186,7 +187,9 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
             formatted_logs.append(f'<p><span class="text-slate-500 font-mono">[{ts}]</span> <span class="text-slate-400 font-mono">> {safe_line}</span></p>')
 
     if not formatted_logs:
-        formatted_logs.append('<p><span class="text-emerald-700">[SYSTEM]</span> <span class="text-slate-500">> Awaiting process initiation...</span></p>')
+        formatted_logs.append('<p><span class="text-emerald-500 font-bold">[SYSTEM_READY]</span> <span class="text-slate-400">Core Synthesizer initialized. HTTP/7860</span></p>')
+        formatted_logs.append('<p><span class="text-cyan-400 font-bold">[PIPELINE]</span> <span class="text-slate-300">Modules: Script, TTS, Whisper, Compositor ACTIVE</span></p>')
+        formatted_logs.append('<p><span class="text-yellow-400 font-bold">[STANDBY]</span> <span class="text-slate-300">> Awaiting process initiation...</span></p>')
 
     # ترتيب عكسي ليعمل التمرير التلقائي بالـ CSS flex-direction: column-reverse
     reversed_log_html = "".join(reversed(formatted_logs))
@@ -220,7 +223,7 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
             b_total = max(b_curr, 1)
 
         batch_header_html = f"""
-        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 mb-3 space-y-2">
+        <div class="cyber-batch-card bg-slate-50 border border-slate-200 rounded-xl p-3.5 mb-3 space-y-2">
             <div class="flex justify-between items-center text-xs">
                 <div class="flex items-center gap-2">
                     <span class="text-slate-800 font-bold">التقدم العام للقائمة كاملة:</span>
@@ -236,8 +239,8 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
                     </span>
                 </div>
             </div>
-            <div class="w-full bg-slate-200 h-3 rounded-full overflow-hidden p-0.5">
-                <div class="bg-gradient-to-l from-emerald-500 to-teal-600 h-full rounded-full transition-all duration-500 shadow-sm" style="width: {b_pct:.1f}%;"></div>
+            <div class="w-full bg-slate-200 h-3 rounded-full overflow-hidden p-0.5" style="height: 12px; background: #e2e8f0; border-radius: 9999px;">
+                <div class="bg-gradient-to-l from-emerald-500 to-teal-600 h-full rounded-full transition-all duration-500 shadow-sm" style="width: {b_pct:.1f}%; height: 100%; border-radius: 9999px; background: linear-gradient(to left, #10b981, #0d9488);"></div>
             </div>
         </div>
         """
@@ -273,19 +276,21 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
         term_foot_right = '<span class="text-emerald-400 font-bold">100% TELEMETRY VERIFIED</span>'
 
     return f"""
-    <div class="w-full select-none" dir="rtl">
+    <div class="cyber-deck-wrapper w-full select-none" dir="rtl">
         {batch_header_html}
-        <div class="grid grid-cols-12 gap-3">
+        <div class="cyber-deck-grid grid grid-cols-12 gap-3">
             <!-- 1. الدوامة المربعة الحلزونية (شاشة CRT داكنة) -->
-            <div class="col-span-3 cyber-chassis rounded-xl p-4 flex flex-col items-center justify-center text-center font-mono">
+            <div class="cyber-spiral-panel col-span-3 cyber-chassis rounded-xl p-4 flex flex-col items-center justify-between text-center font-mono">
                 <div class="text-[11px] font-bold text-yellow-400 pb-1 border-b border-slate-800 w-full mb-1">
                     {spiral_top_tag}
                 </div>
                 
-                <div class="w-24 h-24 flex items-center justify-center relative my-2">
+                <div class="spiral-stage w-24 h-24 flex items-center justify-center relative my-2">
                     <div class="w-20 h-20 spiral-box absolute"></div>
                     <div class="w-14 h-14 spiral-box-inner absolute"></div>
-                    {spiral_center_badge}
+                    <div class="spiral-center-badge">
+                        {spiral_center_badge}
+                    </div>
                 </div>
 
                 <div class="text-xs font-bold text-emerald-400 truncate max-w-[190px] mt-1" title="{safe_topic}">
@@ -295,7 +300,7 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
             </div>
 
             <!-- 2. شاشة تيرمينال الهاكر العريضة (شاشة CRT داكنة) -->
-            <div class="col-span-9 cyber-chassis hacker-screen rounded-xl p-3.5 flex flex-col justify-between" dir="ltr">
+            <div class="cyber-terminal-panel col-span-9 cyber-chassis hacker-screen rounded-xl p-3.5 flex flex-col justify-between" dir="ltr">
                 <div class="flex justify-between items-center pb-2 border-b border-slate-800 text-[11px]">
                     {term_head_left}
                     {term_head_right}
@@ -326,9 +331,195 @@ def run_single_topic(topic):
     for progress_data in execute_topic_stream(topic, 1, 1, mode="single"):
         yield render_dashboard_html(**progress_data)
 
+def extract_topics_from_file(file_obj):
+    """
+    استخراج فائق المرونة لقائمة المواضيع من أي ملف يتم رفعه عبر Gradio:
+    - يدعم مختلف أشكال كائن file_obj في إصدارات Gradio (str, dict, tempfile, FileData, file-like).
+    - يدعم ملفات JSON (قائمة نصوص، أو كائن يحتوي مفتاح topics/videos/list، أو قائمة قواميس).
+    - يدعم ملفات TXT العادية (سطر لكل موضوع).
+    - يدعم ملفات utf-8-sig (BOM)، utf-8، cp1256 (Windows Arabic)، وغيرها.
+    """
+    if not file_obj:
+        return []
+
+    # معالجة التفاف الملف في قائمة (في حال رفع مفرد داخل مصفوفة)
+    if isinstance(file_obj, list):
+        if not file_obj:
+            return []
+        file_obj = file_obj[0]
+
+    raw_bytes = None
+
+    # الحالة 1: قاموس بيانات Gradio (e.g. {"name": "...", "path": "..."})
+    if isinstance(file_obj, dict):
+        path = file_obj.get("path") or file_obj.get("name")
+        if path and os.path.exists(path):
+            with open(path, "rb") as f:
+                raw_bytes = f.read()
+        elif "data" in file_obj:
+            data = file_obj["data"]
+            raw_bytes = data.encode("utf-8") if isinstance(data, str) else data
+
+    # الحالة 2: كائن له خاصية 'path' (مثل Gradio v4+ FileData)
+    elif hasattr(file_obj, "path") and isinstance(file_obj.path, str) and os.path.exists(file_obj.path):
+        with open(file_obj.path, "rb") as f:
+            raw_bytes = f.read()
+
+    # الحالة 3: كائن له خاصية 'name' (مثل tempfile._TemporaryFileWrapper أو NamedString)
+    elif hasattr(file_obj, "name") and isinstance(file_obj.name, str) and os.path.exists(file_obj.name):
+        with open(file_obj.name, "rb") as f:
+            raw_bytes = f.read()
+
+    # الحالة 4: مسار كـ string أو نص مباشر
+    elif isinstance(file_obj, str):
+        if os.path.exists(file_obj):
+            with open(file_obj, "rb") as f:
+                raw_bytes = f.read()
+        else:
+            raw_bytes = file_obj.encode("utf-8")
+
+    # الحالة 5: كائن شبيه بالملفات (file-like) يحتوي دالة .read()
+    elif hasattr(file_obj, "read"):
+        data = file_obj.read()
+        if isinstance(data, bytes):
+            raw_bytes = data
+        elif isinstance(data, str):
+            raw_bytes = data.encode("utf-8")
+
+    if not raw_bytes:
+        return []
+
+    # فك الترميز بمرونة عالية لمنع أي خطأ ترميز
+    content = None
+    for enc in ("utf-8-sig", "utf-8", "cp1256", "windows-1256", "iso-8859-1", "latin-1"):
+        try:
+            content = raw_bytes.decode(enc)
+            break
+        except (UnicodeDecodeError, LookupError):
+            continue
+
+    if content is None:
+        content = raw_bytes.decode("utf-8", errors="replace")
+
+    # تنظيف علامة BOM والمسافات الزائدة
+    content = content.lstrip('\ufeff').strip()
+    if not content:
+        return []
+
+    # إزالة تغليف Markdown إذا قام المستخدم بنسخ كود مثل ```json ... ```
+    if content.startswith("```"):
+        lines = content.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        content = "\n".join(lines).strip()
+
+    def _extract_from_item(item):
+        """استخراج نص الموضوع من أي عنصر (سلسلة نصية، قاموس، أو غيره)"""
+        if isinstance(item, str):
+            val = item.strip()
+            return val if val else None
+        elif isinstance(item, dict):
+            # البحث عن المفاتيح الشائعة أولاً
+            for key in ("topic", "title", "subject", "name", "prompt", "text", "query", "عنوان", "الموضوع", "موضوع"):
+                if key in item and item[key]:
+                    val = str(item[key]).strip()
+                    if val:
+                        return val
+            # وإلا اختيار أول قيمة نصية غير فارغة
+            for val in item.values():
+                if isinstance(val, str) and val.strip():
+                    return val.strip()
+            # أو أي قيمة أولية (رقم / قيمة صالحة)
+            for val in item.values():
+                if val is not None and not isinstance(val, (dict, list)):
+                    s = str(val).strip()
+                    if s:
+                        return s
+        elif item is not None:
+            s = str(item).strip()
+            if s:
+                return s
+        return None
+
+    topics = []
+
+    # المحاولة 1: قراءة الملف كـ JSON
+    try:
+        parsed_json = json.loads(content)
+    except Exception:
+        parsed_json = None
+
+    if parsed_json is not None:
+        # أ) JSON مصفوفة من العناصر
+        if isinstance(parsed_json, list):
+            for it in parsed_json:
+                t = _extract_from_item(it)
+                if t:
+                    topics.append(t)
+        # ب) JSON كائن يحتوي على مصفوفة مواضيع
+        elif isinstance(parsed_json, dict):
+            list_found = None
+            for key in ("topics", "list", "videos", "items", "data", "prompts", "titles", "queue", "مواضيع", "قائمة"):
+                if key in parsed_json and isinstance(parsed_json[key], list):
+                    list_found = parsed_json[key]
+                    break
+            if list_found is None:
+                for v in parsed_json.values():
+                    if isinstance(v, list):
+                        list_found = v
+                        break
+            if list_found is not None:
+                for it in list_found:
+                    t = _extract_from_item(it)
+                    if t:
+                        topics.append(t)
+            else:
+                # إذا كان القاموس نفسه يمثل موضوعاً واحداً
+                t = _extract_from_item(parsed_json)
+                if t:
+                    topics.append(t)
+
+    # المحاولة 2: في حال لم يكن JSON صالحاً أو لم ينتج مواضيع، تحليله كملف نصي عادي سطر بسطر
+    if not topics:
+        for line in content.splitlines():
+            line = line.strip()
+            if not line or line in ("[", "]", "{", "}"):
+                continue
+            # دعم سطور JSON المستقلة (JSONL)
+            if (line.startswith("{") and line.endswith("}")) or (line.startswith("[") and line.endswith("]")):
+                try:
+                    item = json.loads(line)
+                    if isinstance(item, list):
+                        for sub in item:
+                            t = _extract_from_item(sub)
+                            if t:
+                                topics.append(t)
+                    else:
+                        t = _extract_from_item(item)
+                        if t:
+                            topics.append(t)
+                    continue
+                except Exception:
+                    pass
+
+            # تنظيف الفواصل البادئة والنقاط التعدادية وعلامات التنصيص
+            clean_line = line.rstrip(",")
+            m = re.match(r"^(\s*[-*•]\s+|\s*\d+[\.\-\)]\s+)(.*)$", clean_line)
+            if m:
+                clean_line = m.group(2).strip()
+            if (clean_line.startswith('"') and clean_line.endswith('"')) or (clean_line.startswith("'") and clean_line.endswith("'")):
+                clean_line = clean_line[1:-1].strip()
+
+            if clean_line and clean_line not in ("[", "]", "{", "}"):
+                topics.append(clean_line)
+
+    return topics
+
 def run_batch_topics(file_obj):
     if not file_obj:
-        yield render_dashboard_html(mode="batch", percentage=0, step_title="يرجى اختيار ملف", topic="--", logs=["❌ لم يتم رفع أي ملف JSON."], status_type="error")
+        yield render_dashboard_html(mode="batch", percentage=0, step_title="يرجى اختيار ملف", topic="--", logs=["❌ لم يتم رفع أي ملف."], status_type="error")
         return
         
     config_errors = validate_config()
@@ -338,17 +529,13 @@ def run_batch_topics(file_obj):
         return
         
     try:
-        with open(file_obj.name, 'r', encoding='utf-8') as f:
-            topics = json.load(f)
-        if not isinstance(topics, list):
-            yield render_dashboard_html(mode="batch", percentage=0, step_title="تنسيق غير صالح", topic="--", logs=["❌ تنسيق الملف غير صالح. يجب أن يكون قائمة JSON."], status_type="error")
-            return
+        topics = extract_topics_from_file(file_obj)
     except Exception as e:
-        yield render_dashboard_html(mode="batch", percentage=0, step_title="خطأ قراءة", topic="--", logs=[f"❌ خطأ في قراءة الملف: {e}"], status_type="error")
+        yield render_dashboard_html(mode="batch", percentage=0, step_title="خطأ قراءة", topic="--", logs=[f"❌ خطأ غير متوقع أثناء معالجة الملف: {e}"], status_type="error")
         return
         
     if not topics:
-        yield render_dashboard_html(mode="batch", percentage=0, step_title="ملف فارغ", topic="--", logs=["❌ الملف فارغ ولا يحتوي على مواضيع."], status_type="error")
+        yield render_dashboard_html(mode="batch", percentage=0, step_title="ملف فارغ أو غير مدعوم", topic="--", logs=["❌ تعذر استخراج أي مواضيع صالحة من الملف. يرجى التأكد من رفع ملف JSON أو ملف نصي TXT يحتوي على المواضيع."], status_type="error")
         return
 
     state = {"queue": topics, "current_index": 0, "in_progress": True, "completed_times": []}
@@ -553,12 +740,13 @@ def execute_topic_stream(topic, current_num, total_num, mode="single", batch_inf
 # --- تنسيقات CSS العامة (Technical Synthesizer Deck) ---
 # ==============================================================
 
-css = """
+css = r"""
 html, body { 
-    height: 100vh;
+    min-height: 100vh;
     margin: 0;
     padding: 0;
-    overflow: hidden !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
     direction: rtl; 
     text-align: right; 
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Consolas', monospace;
@@ -568,14 +756,15 @@ html, body {
 .gradio-container { 
     max-width: 100% !important; 
     width: 98% !important; 
-    height: 100vh !important;
-    max-height: 100vh !important;
+    min-height: 100vh !important;
+    height: auto !important;
     margin: 0 auto !important; 
-    padding: 6px 12px !important; 
+    padding: 6px 12px 24px 12px !important; 
     box-sizing: border-box !important;
     display: flex !important;
     flex-direction: column !important;
-    overflow: hidden !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
 }
 .hero-header { 
     background: #ffffff; 
@@ -663,7 +852,7 @@ html, body {
     flex: 1 !important;
     display: flex !important;
     flex-direction: column !important;
-    overflow: hidden !important;
+    overflow: visible !important;
 }
 .tab-nav { 
     margin-bottom: 6px !important; 
@@ -682,8 +871,59 @@ html, body {
 }
 .tabitem {
     flex: 1 !important;
-    overflow: hidden !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
     padding: 2px 0 !important;
+}
+
+/* ============================================================== */
+/* --- لوحة القيادة الحية وشاشات CRT الهاكر الداكنة --- */
+/* ============================================================== */
+
+.cyber-deck-wrapper {
+    width: 100% !important;
+    margin-top: 6px !important;
+    box-sizing: border-box !important;
+}
+.cyber-deck-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 12px !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+.cyber-spiral-panel {
+    width: 250px !important;
+    min-width: 250px !important;
+    max-width: 260px !important;
+    flex-shrink: 0 !important;
+    background: #030712 !important;
+    border: 1px solid #1e293b !important;
+    border-top: 1px solid #334155 !important;
+    border-radius: 12px !important;
+    padding: 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    text-align: center !important;
+    box-sizing: border-box !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 4px 12px -2px rgba(15, 23, 42, 0.12), 0 0 15px -3px rgba(34, 197, 94, 0.12) !important;
+}
+.cyber-terminal-panel {
+    flex: 1 !important;
+    min-width: 0 !important;
+    background: #030712 !important;
+    border: 1px solid #1e293b !important;
+    border-top: 1px solid #334155 !important;
+    border-radius: 12px !important;
+    padding: 12px 14px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    box-sizing: border-box !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 4px 12px -2px rgba(15, 23, 42, 0.12), 0 0 15px -3px rgba(34, 197, 94, 0.12) !important;
 }
 
 /* الشاشتان الداكنتان (Hardware CRT Chassis) */
@@ -698,20 +938,51 @@ html, body {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+.spiral-stage {
+    width: 90px !important;
+    height: 90px !important;
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 6px auto !important;
+}
 .spiral-box {
-    border: 2.5px solid transparent;
-    border-top-color: #22c55e;
-    border-right-color: #4ade80;
-    border-radius: 12px;
-    animation: square-spiral 3s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
-    box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+    width: 80px !important;
+    height: 80px !important;
+    position: absolute !important;
+    top: 5px !important;
+    left: 5px !important;
+    box-sizing: border-box !important;
+    border: 2.5px solid transparent !important;
+    border-top-color: #22c55e !important;
+    border-right-color: #4ade80 !important;
+    border-radius: 14px !important;
+    animation: square-spiral 3s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite !important;
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.35) !important;
 }
 .spiral-box-inner {
-    border: 2px solid transparent;
-    border-bottom-color: #15803d;
-    border-left-color: #86efac;
-    border-radius: 8px;
-    animation: square-spiral 2s linear infinite reverse;
+    width: 52px !important;
+    height: 52px !important;
+    position: absolute !important;
+    top: 19px !important;
+    left: 19px !important;
+    box-sizing: border-box !important;
+    border: 2px solid transparent !important;
+    border-bottom-color: #15803d !important;
+    border-left-color: #86efac !important;
+    border-radius: 10px !important;
+    animation: square-spiral 2s linear infinite reverse !important;
+}
+.spiral-center-badge {
+    position: relative !important;
+    z-index: 10 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    pointer-events: none !important;
 }
 
 .hacker-screen {
@@ -726,11 +997,25 @@ html, body {
     display: flex !important;
     flex-direction: column-reverse !important;
     overflow-y: auto !important;
+    overflow-x: hidden !important;
     height: 195px !important;
+    min-height: 195px !important;
     max-height: 195px !important;
-    padding: 4px 8px !important;
-    font-size: 11px !important;
+    padding: 6px 10px !important;
+    font-size: 11.5px !important;
+    line-height: 1.55 !important;
+    box-sizing: border-box !important;
+    background: rgba(0, 0, 0, 0.45) !important;
+    border-radius: 6px !important;
+    border: 1px solid #111827 !important;
+}
+.hacker-terminal-logs p {
+    margin: 1.5px 0 !important;
+    padding: 0 !important;
     line-height: 1.5 !important;
+    white-space: pre-wrap !important;
+    word-break: break-all !important;
+    font-family: 'Consolas', 'Courier New', monospace !important;
 }
 .hacker-cursor {
     display: inline-block;
@@ -745,14 +1030,145 @@ html, body {
     50% { opacity: 0; }
 }
 .hacker-scroll::-webkit-scrollbar {
-    width: 4px;
+    width: 5px;
 }
 .hacker-scroll::-webkit-scrollbar-track {
     background: #030712;
 }
 .hacker-scroll::-webkit-scrollbar-thumb {
     background: #15803d;
-    border-radius: 2px;
+    border-radius: 3px;
+}
+
+/* ============================================================== */
+/* --- Pure CSS Tailwind Equivalents for Gradio Compatibility --- */
+/* ============================================================== */
+.grid { display: grid !important; }
+.grid-cols-12 { grid-template-columns: repeat(12, minmax(0, 1fr)) !important; }
+.col-span-3 { grid-column: span 3 / span 3 !important; }
+.col-span-9 { grid-column: span 9 / span 9 !important; }
+.gap-1 { gap: 4px !important; }
+.gap-1\.5 { gap: 6px !important; }
+.gap-2 { gap: 8px !important; }
+.gap-3 { gap: 12px !important; }
+.gap-4 { gap: 16px !important; }
+
+.flex { display: flex !important; }
+.flex-col { flex-direction: column !important; }
+.items-center { align-items: center !important; }
+.justify-center { justify-content: center !important; }
+.justify-between { justify-content: space-between !important; }
+
+.w-full { width: 100% !important; }
+.w-2 { width: 8px !important; }
+.h-2 { height: 8px !important; }
+.w-14 { width: 56px !important; }
+.h-14 { height: 56px !important; }
+.w-20 { width: 80px !important; }
+.h-20 { height: 80px !important; }
+.w-24 { width: 96px !important; }
+.h-24 { height: 96px !important; }
+.h-full { height: 100% !important; }
+.h-3 { height: 12px !important; }
+
+.relative { position: relative !important; }
+.absolute { position: absolute !important; }
+.z-10 { z-index: 10 !important; }
+
+.p-0\.5 { padding: 2px !important; }
+.p-3\.5 { padding: 14px !important; }
+.p-4 { padding: 16px !important; }
+.px-2 { padding-left: 8px !important; padding-right: 8px !important; }
+.px-2\.5 { padding-left: 10px !important; padding-right: 10px !important; }
+.py-0\.5 { padding-top: 2px !important; padding-bottom: 2px !important; }
+.py-1 { padding-top: 4px !important; padding-bottom: 4px !important; }
+.pb-1 { padding-bottom: 4px !important; }
+.pb-2 { padding-bottom: 8px !important; }
+.pt-2 { padding-top: 8px !important; }
+.mb-1 { margin-bottom: 4px !important; }
+.mb-3 { margin-bottom: 12px !important; }
+.mt-0\.5 { margin-top: 2px !important; }
+.mt-1 { margin-top: 4px !important; }
+.my-2 { margin-top: 8px !important; margin-bottom: 8px !important; }
+
+.space-y-2 > * + * { margin-top: 8px !important; }
+
+.rounded { border-radius: 4px !important; }
+.rounded-md { border-radius: 6px !important; }
+.rounded-xl { border-radius: 12px !important; }
+.rounded-full { border-radius: 9999px !important; }
+
+.border { border-width: 1px !important; border-style: solid !important; }
+.border-b { border-bottom-width: 1px !important; border-bottom-style: solid !important; }
+.border-t { border-top-width: 1px !important; border-top-style: solid !important; }
+.border-slate-200 { border-color: #e2e8f0 !important; }
+.border-slate-300 { border-color: #cbd5e1 !important; }
+.border-slate-800 { border-color: #1e293b !important; }
+.border-slate-900 { border-color: #0f172a !important; }
+.border-emerald-200 { border-color: #a7f3d0 !important; }
+
+.bg-slate-50 { background-color: #f8fafc !important; }
+.bg-slate-200 { background-color: #e2e8f0 !important; }
+.bg-emerald-100 { background-color: #d1fae5 !important; }
+.bg-emerald-500 { background-color: #10b981 !important; }
+
+.text-emerald-200 { color: #a7f3d0 !important; }
+.text-emerald-300 { color: #6ee7b7 !important; }
+.text-emerald-400 { color: #34d399 !important; }
+.text-emerald-500 { color: #10b981 !important; }
+.text-emerald-600 { color: #059669 !important; }
+.text-emerald-700 { color: #047857 !important; }
+.text-yellow-300 { color: #fde047 !important; }
+.text-yellow-400 { color: #facc15 !important; }
+.text-amber-600 { color: #d97706 !important; }
+.text-cyan-300 { color: #67e8f9 !important; }
+.text-cyan-400 { color: #22d3ee !important; }
+.text-purple-300 { color: #d8b4fe !important; }
+.text-purple-400 { color: #c084fc !important; }
+.text-rose-300 { color: #fda4af !important; }
+.text-rose-400 { color: #fb7185 !important; }
+.text-slate-300 { color: #cbd5e1 !important; }
+.text-slate-400 { color: #94a3b8 !important; }
+.text-slate-500 { color: #64748b !important; }
+.text-slate-600 { color: #475569 !important; }
+.text-slate-800 { color: #1e293b !important; }
+
+.font-mono { font-family: 'Consolas', 'Courier New', monospace !important; }
+.font-sans { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important; }
+.font-bold { font-weight: 700 !important; }
+.font-black { font-weight: 900 !important; }
+
+.text-xs { font-size: 12px !important; }
+.text-sm { font-size: 14px !important; }
+.text-lg { font-size: 18px !important; }
+.text-xl { font-size: 20px !important; }
+.text-\[10px\] { font-size: 10px !important; }
+.text-\[11px\] { font-size: 11px !important; }
+
+.tracking-widest { letter-spacing: 0.1em !important; }
+.truncate { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+.max-w-\[190px\] { max-width: 190px !important; }
+.select-none { user-select: none !important; }
+.overflow-hidden { overflow: hidden !important; }
+
+.bg-gradient-to-l { background-image: linear-gradient(to left, var(--tw-gradient-stops, #10b981, #0d9488)) !important; }
+.from-emerald-500 { --tw-gradient-from: #10b981; }
+.to-teal-600 { --tw-gradient-to: #0d9488; }
+
+@keyframes ping {
+    75%, 100% {
+        transform: scale(2);
+        opacity: 0;
+    }
+}
+.animate-ping {
+    animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite !important;
+}
+@keyframes pulse {
+    50% { opacity: .5; }
+}
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
 }
 """
 
@@ -802,13 +1218,13 @@ with gr.Blocks(title="🎬 صانع الفيديوهات الآلي - v4", theme
         # ==============================================================
         # --- تبويبة 2: الإنتاج بالجملة (لوحة القيادة الحية) ---
         # ==============================================================
-        with gr.TabItem("📚 إنتاج بالجملة (JSON)"):
+        with gr.TabItem("📚 إنتاج بالجملة (JSON / TXT)"):
             with gr.Column(elem_classes=["panel-card"]):
                 resume_alert = gr.Markdown(visible=False)
                 resume_btn = gr.Button("🔄 استكمال العمل السابق غير المكتمل", variant="stop", visible=False, elem_classes=["btn-primary-action"])
                 
                 with gr.Row(equal_height=True):
-                    json_file_input = gr.File(label="ملف قائمة المواضيع (JSON)", file_types=[".json"], scale=4, elem_classes=["compact-file-upload"])
+                    json_file_input = gr.File(label="ملف قائمة المواضيع (JSON أو TXT)", file_types=[".json", ".txt", "text"], scale=4, elem_classes=["compact-file-upload"])
                     batch_start_btn = gr.Button("🚀 إنتاج القائمة كاملة", variant="primary", scale=1, elem_classes=["btn-primary-action"])
                 
             batch_output_log = gr.HTML(
