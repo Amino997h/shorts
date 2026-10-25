@@ -127,6 +127,27 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
     if logs is None:
         logs = []
     
+    # تحديد رموز الحالة التقنية (Status Token)
+    substep_token = "WORKING"
+    if status_type == "error":
+        substep_token = "ERROR"
+    elif percentage >= 100:
+        substep_token = "COMPLETED"
+    elif "[الخطوة 1]" in step_title or "السكربت" in step_title:
+        substep_token = "GENERATING_SCRIPT"
+    elif "[الخطوة 2]" in step_title or "الصوت" in step_title:
+        substep_token = "SYNTHESIZING_VOICE"
+    elif "[الخطوة 3]" in step_title or "Whisper" in step_title:
+        substep_token = "WHISPER_SYNCING"
+    elif "[الخطوة 4]" in step_title or "تخطيط" in step_title:
+        substep_token = "STORYBOARDING"
+    elif "[الخطوة 5]" in step_title or "الصور" in step_title:
+        substep_token = "SCRAPING_MEDIA"
+    elif "[الخطوة 6]" in step_title or "المونتاج" in step_title or "الرندر" in step_title:
+        substep_token = "COMPOSING"
+    elif "[الخطوة 7]" in step_title or "تيليجرام" in step_title:
+        substep_token = "PUBLISHING"
+
     # تنسيق وتلوين أسطر الهاكر
     formatted_logs = []
     for line in logs:
@@ -136,20 +157,33 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
         ts = datetime.now().strftime("%H:%M:%S")
         safe_line = html.escape(line_clean)
         
-        if "[الخطوة" in line_clean or "STEP" in line_clean:
-            formatted_logs.append(f'<p><span class="text-emerald-700">[{ts}]</span> <span class="text-emerald-300 font-bold">[STEP]</span> <span class="text-emerald-400">{safe_line}</span></p>')
-        elif "✓" in line_clean or "تم" in line_clean or "اكتمل" in line_clean:
-            formatted_logs.append(f'<p><span class="text-emerald-700">[{ts}]</span> <span class="text-emerald-400 font-bold">[OK]</span> <span class="text-emerald-300">{safe_line}</span></p>')
-        elif "⚠️" in line_clean or "تنبيه" in line_clean:
-            formatted_logs.append(f'<p><span class="text-emerald-700">[{ts}]</span> <span class="text-yellow-400 font-bold">[WARN]</span> <span class="text-yellow-300">{safe_line}</span></p>')
-        elif "❌" in line_clean or "خطأ" in line_clean or "ERR" in line_clean:
-            formatted_logs.append(f'<p><span class="text-emerald-700">[{ts}]</span> <span class="text-rose-400 font-bold">[ERROR]</span> <span class="text-rose-300">{safe_line}</span></p>')
+        # تحويل الأسطر إلى تنسيقات الهاكر الأنيقة والمطابقة للتصميم
+        if "BATCH_SUCCESS" in line_clean:
+            formatted_logs.append(f'<p><span class="text-emerald-400 font-bold">BATCH_SUCCESS</span> <span class="text-emerald-300">{safe_line.replace("BATCH_SUCCESS", "").strip()}</span></p>')
+        elif "BATCH_INIT" in line_clean or "Starting video" in line_clean:
+            formatted_logs.append(f'<p><span class="text-yellow-400 font-bold">BATCH_INIT</span> <span class="text-slate-300">{safe_line.replace("BATCH_INIT", "").replace("EXECUTE:", "").strip()}</span></p>')
+        elif "[الخطوة 1]" in line_clean or "كتابة السكربت" in line_clean or "API_POST" in line_clean:
+            formatted_logs.append(f'<p><span class="text-emerald-300 font-bold">API_POST</span> <span class="text-emerald-400">{safe_line}</span></p>')
+        elif "تم توليد السكربت" in line_clean or "SCRIPT_200" in line_clean:
+            formatted_logs.append(f'<p><span class="text-emerald-400 font-bold">SCRIPT_200</span> <span class="text-emerald-300">{safe_line}</span></p>')
+        elif "[الخطوة 2]" in line_clean or "توليد الصوت" in line_clean or "EDGE_TTS" in line_clean:
+            formatted_logs.append(f'<p><span class="text-yellow-400 font-bold">EDGE_TTS</span> <span class="text-yellow-300">{safe_line}</span></p>')
+        elif "[الخطوة 3]" in line_clean or "Whisper" in line_clean or "WHISPER_SYNC" in line_clean:
+            formatted_logs.append(f'<p><span class="text-cyan-400 font-bold">WHISPER_SYNC</span> <span class="text-cyan-300">{safe_line}</span></p>')
         elif "جاري البحث عن:" in line_clean or "BING" in line_clean:
-            formatted_logs.append(f'<p><span class="text-emerald-700">[{ts}]</span> <span class="text-cyan-400 font-bold">[SCRAPE]</span> <span class="text-cyan-300">{safe_line}</span></p>')
-        elif "🎮" in line_clean or "🎵" in line_clean or "🎯" in line_clean or "🎬" in line_clean:
-            formatted_logs.append(f'<p><span class="text-emerald-700">[{ts}]</span> <span class="text-purple-400 font-bold">[MEDIA]</span> <span class="text-purple-300">{safe_line}</span></p>')
+            formatted_logs.append(f'<p><span class="text-emerald-300 font-bold">BING_QUERY</span> <span class="text-emerald-200">{safe_line}</span></p>')
+        elif "IMG_200" in line_clean or "تم تنزيل وتدقيق" in line_clean or "[الخطوة 5]" in line_clean:
+            formatted_logs.append(f'<p><span class="text-emerald-400 font-bold">IMG_200</span> <span class="text-emerald-300">{safe_line}</span></p>')
+        elif "[الخطوة 6]" in line_clean or "المونتاج" in line_clean or "COMPOSITOR" in line_clean:
+            formatted_logs.append(f'<p><span class="text-purple-400 font-bold">COMPOSITOR</span> <span class="text-purple-300">{safe_line}</span></p>')
+        elif "✓" in line_clean or "تم إنتاج الفيديو" in line_clean or "SUCCESS" in line_clean:
+            formatted_logs.append(f'<p><span class="text-emerald-400 font-bold">[OK]</span> <span class="text-emerald-300">{safe_line}</span></p>')
+        elif "⚠️" in line_clean or "تنبيه" in line_clean or "WARN" in line_clean:
+            formatted_logs.append(f'<p><span class="text-yellow-400 font-bold">[WARN]</span> <span class="text-yellow-300">{safe_line}</span></p>')
+        elif "❌" in line_clean or "خطأ" in line_clean or "ERROR" in line_clean:
+            formatted_logs.append(f'<p><span class="text-rose-400 font-bold">[ERROR]</span> <span class="text-rose-300">{safe_line}</span></p>')
         else:
-            formatted_logs.append(f'<p><span class="text-emerald-700">[{ts}]</span> <span class="text-slate-400 font-mono">> {safe_line}</span></p>')
+            formatted_logs.append(f'<p><span class="text-slate-500 font-mono">[{ts}]</span> <span class="text-slate-400 font-mono">> {safe_line}</span></p>')
 
     if not formatted_logs:
         formatted_logs.append('<p><span class="text-emerald-700">[SYSTEM]</span> <span class="text-slate-500">> Awaiting process initiation...</span></p>')
@@ -174,15 +208,17 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
     safe_topic = html.escape(topic)
     safe_step = html.escape(step_title)
 
-    # قالب وضع الجملة الإضافي بالأعلى (Batch Progress Header)
-    batch_header_html = ""
+    # تجهيز تفاصيل الوضعين (Batch vs Single)
     if mode == "batch" and batch_info:
-        b_pct = batch_info.get("pct", 0)
+        b_pct = batch_info.get("pct", 0.0)
         b_comp = batch_info.get("completed", 0)
-        b_curr = batch_info.get("current", 0)
+        b_curr = batch_info.get("current", 1)
         b_rem = batch_info.get("remaining", 0)
         b_avg = batch_info.get("avg_sec", "--")
-        
+        b_total = b_comp + b_rem + (1 if b_rem > 0 or b_comp < b_curr else 0)
+        if b_total == 0:
+            b_total = max(b_curr, 1)
+
         batch_header_html = f"""
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 mb-3 space-y-2">
             <div class="flex justify-between items-center text-xs">
@@ -206,7 +242,35 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
         </div>
         """
 
-    worker_label = f"ACTIVE_WORKER [#{batch_info.get('current', 1)}]" if (mode == "batch" and batch_info) else "ACTIVE_PROCESS"
+        # نصوص الصندوقين مطابقة 100% للبريفيو المعتمد
+        spiral_top_tag = f"ACTIVE_WORKER [#{b_curr}]"
+        spiral_center_badge = f'<span class="z-10 text-emerald-300 font-black text-sm font-mono tracking-widest">#{b_curr}</span>'
+        spiral_status_bottom = f'<span class="text-[10px] text-emerald-600 mt-0.5">[STATUS: {substep_token}]</span>'
+
+        term_head_left = f'<span class="font-bold text-emerald-400">BATCH_QUEUE: [{b_curr}/{b_total} VIDEOS]</span>'
+        term_head_right = '<span class="text-emerald-600 text-[10px]">ACTIVE WORKER</span>'
+        term_foot_left = f'<span>TOTAL_COMPLETED: {b_comp}</span>'
+        term_foot_right = '<span class="text-emerald-400 font-bold">SYSTEM_HEALTH: 100%</span>'
+    else:
+        batch_header_html = ""
+        spiral_top_tag = "CURRENT_PROCESS"
+        spiral_center_badge = f"""
+        <div class="z-10 flex flex-col items-center">
+            <span class="text-emerald-300 font-black text-lg tracking-widest">{pct_display}</span>
+            <span class="{badge_class} text-[10px] font-bold">{badge_text}</span>
+        </div>
+        """
+        spiral_status_bottom = f'<span class="text-[10px] text-emerald-600 mt-0.5">[{safe_step}]</span>'
+
+        term_head_left = """
+        <span class="font-bold text-emerald-400 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            ROOT@AI-CORE: ~/TERMINAL_FEED
+        </span>
+        """
+        term_head_right = '<span class="text-slate-500 text-[10px]">LIVE STREAMING // HTTP/7860</span>'
+        term_foot_left = f'<span>STATUS: {badge_text}</span>'
+        term_foot_right = '<span class="text-emerald-400 font-bold">100% TELEMETRY VERIFIED</span>'
 
     return f"""
     <div class="w-full select-none" dir="rtl">
@@ -214,33 +278,27 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
         <div class="grid grid-cols-12 gap-3">
             <!-- 1. الدوامة المربعة الحلزونية (شاشة CRT داكنة) -->
             <div class="col-span-3 cyber-chassis rounded-xl p-4 flex flex-col items-center justify-center text-center font-mono">
-                <div class="text-[11px] font-bold text-emerald-500 pb-1 border-b border-slate-800 w-full mb-1">
-                    {worker_label}
+                <div class="text-[11px] font-bold text-yellow-400 pb-1 border-b border-slate-800 w-full mb-1">
+                    {spiral_top_tag}
                 </div>
                 
-                <div class="w-28 h-28 flex items-center justify-center relative my-2">
-                    <div class="w-24 h-24 spiral-box absolute"></div>
-                    <div class="w-16 h-16 spiral-box-inner absolute"></div>
-                    <div class="z-10 flex flex-col items-center">
-                        <span class="text-emerald-300 font-black text-lg tracking-widest">{pct_display}</span>
-                        <span class="{badge_class} text-[10px] font-bold">{badge_text}</span>
-                    </div>
+                <div class="w-24 h-24 flex items-center justify-center relative my-2">
+                    <div class="w-20 h-20 spiral-box absolute"></div>
+                    <div class="w-14 h-14 spiral-box-inner absolute"></div>
+                    {spiral_center_badge}
                 </div>
 
-                <div class="text-xs text-emerald-400 font-bold truncate max-w-[190px] mt-1" title="{safe_topic}">
+                <div class="text-xs font-bold text-emerald-400 truncate max-w-[190px] mt-1" title="{safe_topic}">
                     "{safe_topic}"
                 </div>
-                <span class="text-[10px] text-emerald-600 mt-0.5 truncate max-w-[190px]">[{safe_step}]</span>
+                {spiral_status_bottom}
             </div>
 
             <!-- 2. شاشة تيرمينال الهاكر العريضة (شاشة CRT داكنة) -->
             <div class="col-span-9 cyber-chassis hacker-screen rounded-xl p-3.5 flex flex-col justify-between" dir="ltr">
                 <div class="flex justify-between items-center pb-2 border-b border-slate-800 text-[11px]">
-                    <span class="font-bold text-emerald-400 flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                        ROOT@AI-CORE: ~/TERMINAL_FEED
-                    </span>
-                    <span class="text-slate-500 text-[10px]">LIVE STREAMING // HTTP/7860</span>
+                    {term_head_left}
+                    {term_head_right}
                 </div>
 
                 <!-- الأسطر التفصيلية بنمط فلكس معكوس للتمرير التلقائي السلس -->
@@ -250,8 +308,8 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
                 </div>
 
                 <div class="pt-2 border-t border-slate-900 text-[10px] text-slate-500 flex justify-between font-mono">
-                    <span>STATUS: {badge_text}</span>
-                    <span class="text-emerald-400 font-bold">100% TELEMETRY VERIFIED</span>
+                    {term_foot_left}
+                    {term_foot_right}
                 </div>
             </div>
         </div>
