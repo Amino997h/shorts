@@ -1967,67 +1967,24 @@ with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(prima
         <p>{t("hero_subtitle", selected_lang)}</p>
         """
         
-        new_badge = f"""
-        <div class="cyber-status-badge" style="display: flex; align-items: center; gap: 6px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-family: monospace; color: #0f172a; white-space: nowrap;">
-            <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
-            <span>{t("system_online", selected_lang)}</span>
-        </div>
-        """
-        
-        return [
-            gr.update(value=new_header),
-            gr.update(value=new_badge),
-            gr.update(label=t("tab_single", selected_lang)),
-            gr.update(label=t("single_topic_label", selected_lang), placeholder=t("single_topic_placeholder", selected_lang)),
-            gr.update(value=t("single_start_btn", selected_lang)),
-            gr.update(value=render_dashboard_html(mode="single", percentage=0, step_title=t("single_initial_step", selected_lang), topic=t("single_initial_topic", selected_lang))),
-            gr.update(label=t("tab_batch", selected_lang)),
-            gr.update(value=t("resume_btn", selected_lang)),
-            gr.update(label=t("batch_file_label", selected_lang)),
-            gr.update(value=t("batch_start_btn", selected_lang)),
-            gr.update(value=render_dashboard_html(mode="batch", percentage=0, step_title=t("batch_initial_step", selected_lang), topic=t("batch_initial_topic", selected_lang), batch_info={"pct": 0.0, "completed": 0, "current": 1, "remaining": 0, "avg_sec": "--"})),
-            gr.update(label=t("tab_assets", selected_lang)),
-            gr.update(value=f"<div class='panel-title'>{t('section_hook_gameplay', selected_lang)}</div>"),
-            gr.update(label=t("gameplay_label", selected_lang), placeholder=t("gameplay_placeholder", selected_lang)),
-            gr.update(label=t("upload_btn_label", selected_lang)),
-            gr.update(label=t("hook_dir_label", selected_lang), placeholder=t("hook_dir_placeholder", selected_lang)),
-            gr.update(label=t("upload_btn_label", selected_lang)),
-            gr.update(label=t("hook_audio_label", selected_lang), placeholder=t("hook_audio_placeholder", selected_lang)),
-            gr.update(label=t("upload_btn_label", selected_lang)),
-            gr.update(value=f"<div class='panel-title'>{t('section_music_outro', selected_lang)}</div>"),
-            gr.update(label=t("bg_music_label", selected_lang), placeholder=t("bg_music_placeholder", selected_lang)),
-            gr.update(label=t("upload_btn_label", selected_lang)),
-            gr.update(label=t("outro_label", selected_lang), placeholder=t("outro_placeholder", selected_lang)),
-            gr.update(label=t("upload_btn_label", selected_lang)),
-            gr.update(value=t("save_assets_btn", selected_lang)),
-            gr.update(label=t("tab_settings", selected_lang)),
-            gr.update(value=f"<div class='panel-title'>{t('section_ai_voice', selected_lang)}</div>"),
-            gr.update(label=t("api_url_label", selected_lang)),
-            gr.update(label=t("api_key_label", selected_lang)),
-            gr.update(label=t("voice_label", selected_lang)),
-            gr.update(value=f"<div class='panel-title'>{t('section_telegram', selected_lang)}</div>"),
-            gr.update(label=t("tg_checkbox_label", selected_lang), info=t("tg_checkbox_info", selected_lang)),
-            gr.update(label=t("bot_token_label", selected_lang)),
-            gr.update(label=t("channel_id_label", selected_lang)),
-            gr.update(value=t("save_settings_btn", selected_lang))
-        ]
+    # تبديل اللغة السلس مع الحفظ وإعادة التحميل النظيف الفوري (بدون أي أخطاء وبدون فقدان التنسيق)
+    def switch_language_live(selected_lang):
+        try:
+            cfg = {}
+            if os.path.exists(CONFIG_FILE):
+                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+            cfg["ui_language"] = selected_lang
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(cfg, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"Error persisting language: {e}")
+        return None
 
-    live_ui_outputs = [
-        header_html, system_badge_html,
-        tab_single_item, single_topic_input, single_start_btn, single_output_log,
-        tab_batch_item, resume_btn, json_file_input, batch_start_btn, batch_output_log,
-        tab_assets_item, section_hook_md, gameplay_path_input, gameplay_file_upload,
-        hook_dir_input, hooks_folder_upload, hook_audio_input, hook_audio_upload,
-        section_music_md, bg_music_input, bg_music_upload, outro_path_input, outro_upload, save_assets_btn,
-        tab_settings_item, section_ai_md, api_url_input, api_key_input, voice_input,
-        section_tg_md, upload_telegram_checkbox, bot_token_input, channel_id_input, save_api_btn
-    ]
-
-    # ربط التبديل الفوري مع ضبط اتجاه الصفحة ديناميكياً بدون ريلود
     lang_selector.change(
         fn=switch_language_live,
         inputs=lang_selector,
-        outputs=live_ui_outputs,
+        outputs=None,
         js="""(selected_lang) => {
             if (selected_lang === 'ar') {
                 document.documentElement.dir = 'rtl';
@@ -2036,6 +1993,9 @@ with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(prima
                 document.documentElement.dir = 'ltr';
                 document.body.dir = 'ltr';
             }
+            setTimeout(() => {
+                window.location.reload();
+            }, 120);
         }"""
     )
 
