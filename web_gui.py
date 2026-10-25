@@ -366,24 +366,29 @@ def save_state(state):
 
 def check_resume_status():
     state = load_state()
+    curr_lang = get_current_lang()
     if state.get("in_progress") and state.get("queue"):
         total = len(state["queue"])
         curr = state.get("current_index", 0) + 1
         if curr <= total:
-            return gr.update(visible=True, value=f"⚠️ **تنبيه:** توجد قائمة سابقة غير مكتملة متوقفة عند الفيديو ({curr}/{total}). هل تريد الاستكمال؟")
+            return gr.update(visible=True, value=t("resume_alert_template", curr_lang, curr=curr, total=total))
     return gr.update(visible=False, value="")
 
 # ==============================================================
 # --- المكونات البصرية الحية (Live Cyber Dashboard Generator) ---
 # ==============================================================
 
-def render_dashboard_html(mode="single", percentage=0, step_title="في الانتظار...", topic="--", logs=None, batch_info=None, status_type="active"):
+def render_dashboard_html(mode="single", percentage=0, step_title=None, topic="--", logs=None, batch_info=None, status_type="active", lang=None):
     """
     توليد واجهة المتابعة الحية بنظام Technical Synthesizer Deck:
     تصميم فاتح أنيق مع شاشتي هاكر داكنتين CRT (الدوامة والكونسول).
     """
     if logs is None:
         logs = []
+    if not lang:
+        lang = get_current_lang()
+    if step_title is None:
+        step_title = t("single_initial_step", lang) if mode == "single" else t("batch_initial_step", lang)
     
     # تحديد رموز الحالة التقنية (Status Token)
     substep_token = "WORKING"
@@ -391,19 +396,19 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
         substep_token = "ERROR"
     elif percentage >= 100:
         substep_token = "COMPLETED"
-    elif "[الخطوة 1]" in step_title or "السكربت" in step_title:
+    elif "[الخطوة 1]" in step_title or "السكربت" in step_title or "Script" in step_title:
         substep_token = "GENERATING_SCRIPT"
-    elif "[الخطوة 2]" in step_title or "الصوت" in step_title:
+    elif "[الخطوة 2]" in step_title or "الصوت" in step_title or "Voice" in step_title:
         substep_token = "SYNTHESIZING_VOICE"
     elif "[الخطوة 3]" in step_title or "Whisper" in step_title:
         substep_token = "WHISPER_SYNCING"
-    elif "[الخطوة 4]" in step_title or "تخطيط" in step_title:
+    elif "[الخطوة 4]" in step_title or "تخطيط" in step_title or "Storyboard" in step_title:
         substep_token = "STORYBOARDING"
-    elif "[الخطوة 5]" in step_title or "الصور" in step_title:
+    elif "[الخطوة 5]" in step_title or "الصور" in step_title or "Media" in step_title:
         substep_token = "SCRAPING_MEDIA"
-    elif "[الخطوة 6]" in step_title or "المونتاج" in step_title or "الرندر" in step_title:
+    elif "[الخطوة 6]" in step_title or "المونتاج" in step_title or "الرندر" in step_title or "Compositing" in step_title:
         substep_token = "COMPOSING"
-    elif "[الخطوة 7]" in step_title or "تيليجرام" in step_title:
+    elif "[الخطوة 7]" in step_title or "تيليجرام" in step_title or "Telegram" in step_title:
         substep_token = "PUBLISHING"
 
     # تنسيق وتلوين أسطر الهاكر
@@ -444,9 +449,9 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
             formatted_logs.append(f'<p><span class="text-slate-500 font-mono">[{ts}]</span> <span class="text-slate-400 font-mono">> {safe_line}</span></p>')
 
     if not formatted_logs:
-        formatted_logs.append('<p><span class="text-emerald-500 font-bold">[SYSTEM_READY]</span> <span class="text-slate-400">Core Synthesizer initialized. HTTP/7860</span></p>')
-        formatted_logs.append('<p><span class="text-cyan-400 font-bold">[PIPELINE]</span> <span class="text-slate-300">Modules: Script, TTS, Whisper, Compositor ACTIVE</span></p>')
-        formatted_logs.append('<p><span class="text-yellow-400 font-bold">[STANDBY]</span> <span class="text-slate-300">> Awaiting process initiation...</span></p>')
+        formatted_logs.append(f'<p><span class="text-emerald-500 font-bold">[SYSTEM_READY]</span> <span class="text-slate-400">{t("sys_ready_log", lang)}</span></p>')
+        formatted_logs.append(f'<p><span class="text-cyan-400 font-bold">[PIPELINE]</span> <span class="text-slate-300">{t("pipeline_active_log", lang)}</span></p>')
+        formatted_logs.append(f'<p><span class="text-yellow-400 font-bold">[STANDBY]</span> <span class="text-slate-300">> {t("standby_log", lang)}</span></p>')
 
     # ترتيب عكسي ليعمل التمرير التلقائي بالـ CSS flex-direction: column-reverse
     reversed_log_html = "".join(reversed(formatted_logs))
@@ -469,7 +474,7 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
     safe_step = html.escape(step_title)
 
     # تجهيز تفاصيل الوضعين (Batch vs Single)
-    current_lang = get_current_lang()
+    current_lang = lang if lang else get_current_lang()
     is_ar = (current_lang == "ar")
     deck_dir = "rtl" if is_ar else "ltr"
     progress_gradient = "linear-gradient(to left, #10b981, #0d9488)" if is_ar else "linear-gradient(to right, #10b981, #0d9488)"
@@ -486,12 +491,12 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
 
         batch_header_html = f"""
         <div class="cyber-batch-card bg-slate-50 border border-slate-200 rounded-xl p-3.5 mb-3 space-y-2">
-            <div class="flex justify-between items-center text-xs">
+            <div class="flex justify-between items-center text-xs batch-stats-row">
                 <div class="flex items-center gap-2">
                     <span class="text-slate-800 font-bold">{t('batch_progress_title', current_lang)}</span>
                     <span class="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">{b_pct:.1f}%</span>
                 </div>
-                <div class="text-slate-600 font-mono text-xs flex items-center gap-4">
+                <div class="text-slate-600 font-mono text-xs flex items-center gap-3 batch-stats-badges flex-wrap">
                     <span>✅ {t('completed_label', current_lang)}: <strong class="text-emerald-700 font-bold text-sm">{b_comp}</strong> {t('videos_unit', current_lang)}</span>
                     <span>⚡ {t('current_label', current_lang)}: <strong class="text-amber-600 font-bold text-sm">#{b_curr}</strong></span>
                     <span>⏳ {t('remaining_label', current_lang)}: <strong class="text-slate-800 font-bold text-sm">{b_rem}</strong> {t('videos_unit', current_lang)}</span>
@@ -518,7 +523,7 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
         term_foot_right = '<span class="text-emerald-400 font-bold">SYSTEM_HEALTH: 100%</span>'
     else:
         batch_header_html = ""
-        spiral_top_tag = "CURRENT_PROCESS"
+        spiral_top_tag = t("current_process", current_lang)
         spiral_center_badge = f"""
         <div class="z-10 flex flex-col items-center">
             <span class="text-emerald-300 font-black text-lg tracking-widest">{pct_display}</span>
@@ -584,10 +589,11 @@ def render_dashboard_html(mode="single", percentage=0, step_title="في الان
     """
 
 def run_single_topic(topic):
+    curr_lang = get_current_lang()
     config_errors = validate_config()
     if config_errors:
-        err_msg = "⛔ خطأ في الإعدادات:\n" + "\n".join(config_errors)
-        yield render_dashboard_html(mode="single", percentage=0, step_title="خطأ في الإعدادات", topic=topic, logs=[err_msg], status_type="error")
+        err_msg = t("config_err_header", curr_lang) + "\n".join(config_errors)
+        yield render_dashboard_html(mode="single", percentage=0, step_title=t("config_err_step", curr_lang), topic=topic, logs=[err_msg], status_type="error", lang=curr_lang)
         return
         
     for progress_data in execute_topic_stream(topic, 1, 1, mode="single"):
@@ -1037,6 +1043,10 @@ html, body {{
     font-family: {font_family};
     background-color: #f1f5f9;
     color: #0f172a;
+    box-sizing: border-box;
+}}
+*, *:before, *:after {{
+    box-sizing: border-box;
 }}
 .gradio-container {{ 
     max-width: 100% !important; 
@@ -1053,36 +1063,194 @@ html, body {{
     direction: {page_dir};
     text-align: {page_align};
 }}
+
+[dir="rtl"], [dir="rtl"] .gradio-container {{
+    direction: rtl !important;
+    text-align: right !important;
+}}
+[dir="ltr"], [dir="ltr"] .gradio-container {{
+    direction: ltr !important;
+    text-align: left !important;
+}}
+[dir="rtl"] .hero-header {{
+    border-right: 4px solid #059669 !important;
+    border-left: 1px solid #cbd5e1 !important;
+}}
+[dir="ltr"] .hero-header {{
+    border-left: 4px solid #059669 !important;
+    border-right: 1px solid #cbd5e1 !important;
+}}
+
 .hero-header {{ 
-    background: #ffffff; 
-    border: 1px solid #cbd5e1;
+    background: #ffffff !important; 
+    border: 1px solid #cbd5e1 !important;
     {border_hero}
-    padding: 6px 14px; 
-    border-radius: 8px; 
-    margin-bottom: 6px; 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05); 
-    flex-shrink: 0;
+    padding: 8px 14px !important; 
+    border-radius: 10px !important; 
+    margin-bottom: 8px !important; 
+    display: flex !important; 
+    flex-direction: row !important;
+    justify-content: space-between !important; 
+    align-items: center !important; 
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05) !important; 
+    flex-shrink: 0 !important;
+    gap: 12px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
 }}
-.hero-header h1 {{ 
-    color: #0f172a !important; 
-    margin: 0 !important; 
-    font-size: 15px !important; 
-    font-weight: 700; 
+.hero-info-col {{
+    flex: 1 1 auto !important;
+    min-width: 240px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
 }}
-.hero-header p {{ 
-    color: #64748b !important; 
-    margin: 0 !important; 
-    font-size: 11px !important; 
+.hero-controls-col {{
+    flex: 0 0 auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
 }}
+.hero-controls-inner {{
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 10px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}}
+.cyber-status-badge {{
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    background: #0f172a !important;
+    border: 1px solid #1e293b !important;
+    padding: 4px 10px !important;
+    border-radius: 9999px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    font-family: 'Consolas', 'Courier New', monospace !important;
+    color: #38bdf8 !important;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.5), 0 0 8px rgba(56, 189, 248, 0.15) !important;
+    white-space: nowrap !important;
+    user-select: none !important;
+    height: 32px !important;
+    box-sizing: border-box !important;
+}}
+.cyber-status-badge .status-dot {{
+    width: 7px !important;
+    height: 7px !important;
+    border-radius: 50% !important;
+    background: #10b981 !important;
+    display: inline-block !important;
+    box-shadow: 0 0 6px #10b981 !important;
+    animation: status-pulse 2s infinite !important;
+}}
+@keyframes status-pulse {{
+    0%, 100% {{ opacity: 1; transform: scale(1); }}
+    50% {{ opacity: 0.4; transform: scale(0.85); }}
+}}
+
+/* ============================================================== */
+/* --- Cyber Language Segmented Toggle Pill [ EN | AR ] --- */
+/* ============================================================== */
+.lang-pill-switch {{
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    min-height: auto !important;
+    min-width: 0 !important;
+    flex: 0 0 auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+}}
+.lang-pill-switch > label,
+.lang-pill-switch > span:first-child:not(label span) {{
+    display: none !important;
+}}
+.lang-pill-switch fieldset,
+.lang-pill-switch .wrap,
+.lang-pill-switch [data-testid="radio-group"],
+.lang-pill-switch .gr-form,
+.lang-pill-switch > div {{
+    background: #0f172a !important;
+    border: 1px solid #334155 !important;
+    border-radius: 9999px !important;
+    padding: 2.5px 3px !important;
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 2px !important;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.6), 0 0 10px rgba(16, 185, 129, 0.12) !important;
+    margin: 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    height: 32px !important;
+    box-sizing: border-box !important;
+}}
+.lang-pill-switch label {{
+    margin: 0 !important;
+    padding: 3px 13px !important;
+    border-radius: 9999px !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    font-family: inherit !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: transparent !important;
+    border: none !important;
+    color: #94a3b8 !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    user-select: none !important;
+    white-space: nowrap !important;
+    line-height: 1.3 !important;
+    box-shadow: none !important;
+    height: 25px !important;
+    box-sizing: border-box !important;
+}}
+.lang-pill-switch label:hover {{
+    color: #f8fafc !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+}}
+.lang-pill-switch label:has(input:checked),
+.lang-pill-switch label.selected,
+.lang-pill-switch label[data-selected="true"] {{
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important;
+}}
+.lang-pill-switch input[type="radio"] {{
+    position: absolute !important;
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    pointer-events: none !important;
+    margin: 0 !important;
+}}
+.lang-pill-switch label span {{
+    font-size: 11.5px !important;
+    letter-spacing: 0.02em !important;
+    font-weight: 700 !important;
+    color: inherit !important;
+}}
+
 .panel-card {{ 
     background: #ffffff; 
     border: 1px solid #e2e8f0; 
     border-radius: 8px; 
     padding: 8px 12px; 
     box-shadow: 0 1px 2px rgba(0,0,0,0.03); 
+    box-sizing: border-box;
 }}
 .panel-title {{ 
     font-size: 13px !important; 
@@ -1108,12 +1276,14 @@ html, body {{
     border-radius: 6px !important;
     border: 1px solid #cbd5e1 !important;
     background-color: #f8fafc !important;
+    box-sizing: border-box !important;
 }}
 .compact-file-upload {{ 
     min-height: 32px !important; 
     height: 32px !important; 
     padding: 0 !important; 
     margin: 0 !important;
+    box-sizing: border-box !important;
 }}
 .compact-file-upload .upload-button, 
 .compact-file-upload .wrap {{ 
@@ -1121,6 +1291,7 @@ html, body {{
     height: 30px !important; 
     padding: 2px 8px !important; 
     font-size: 11px !important; 
+    box-sizing: border-box !important;
 }}
 .btn-primary-action {{ 
     height: 36px !important; 
@@ -1131,6 +1302,7 @@ html, body {{
     background-color: #059669 !important;
     border: 1px solid #047857 !important;
     color: #ffffff !important;
+    cursor: pointer !important;
 }}
 .btn-primary-action:hover {{
     background-color: #047857 !important;
@@ -1199,7 +1371,7 @@ html, body {{
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 4px 12px -2px rgba(15, 23, 42, 0.12), 0 0 15px -3px rgba(34, 197, 94, 0.12) !important;
 }}
 .cyber-terminal-panel {{
-    flex: 1 !important;
+    flex: 1 1 0 !important;
     min-width: 0 !important;
     background: #030712 !important;
     border: 1px solid #1e293b !important;
@@ -1328,6 +1500,103 @@ html, body {{
 }}
 
 /* ============================================================== */
+/* --- 100% Fully Responsive Layout & Media Queries --- */
+/* ============================================================== */
+
+@media screen and (max-width: 900px) {{
+    .cyber-deck-grid {{
+        display: flex !important;
+        flex-direction: column !important;
+        grid-template-columns: none !important;
+        gap: 12px !important;
+    }}
+    .cyber-spiral-panel,
+    .cyber-terminal-panel {{
+        width: 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+        grid-column: auto !important;
+        padding: 10px !important;
+    }}
+    .cyber-spiral-panel .truncate {{
+        max-width: 90% !important;
+    }}
+    .hero-header {{
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+        padding: 10px 12px !important;
+    }}
+    .hero-controls-inner {{
+        justify-content: space-between !important;
+        width: 100% !important;
+        margin-top: 4px !important;
+    }}
+    .panel-columns-row {{
+        flex-direction: column !important;
+        gap: 10px !important;
+    }}
+    .panel-columns-row > div {{
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 1 1 100% !important;
+    }}
+}}
+
+@media screen and (max-width: 680px) {{
+    .action-input-row, .asset-upload-row {{
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 6px !important;
+    }}
+    .action-input-row > *, .asset-upload-row > * {{
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 1 1 100% !important;
+    }}
+    .cyber-batch-card .batch-stats-row {{
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 6px !important;
+    }}
+}}
+
+@media screen and (max-width: 480px) {{
+    .gradio-container {{
+        width: 100% !important;
+        padding: 4px 4px 16px 4px !important;
+    }}
+    .hero-header {{
+        padding: 8px 10px !important;
+    }}
+    .hero-header h1 {{
+        font-size: 13px !important;
+    }}
+    .hero-controls-inner {{
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+    }}
+    .lang-pill-switch label {{
+        padding: 3px 9px !important;
+        font-size: 10.5px !important;
+    }}
+    .cyber-status-badge {{
+        font-size: 10px !important;
+        padding: 4px 8px !important;
+    }}
+    .hacker-terminal-logs {{
+        height: 160px !important;
+        min-height: 160px !important;
+        max-height: 160px !important;
+        font-size: 10.5px !important;
+    }}
+    .tab-nav > button {{
+        padding: 4px 8px !important;
+        font-size: 11px !important;
+    }}
+}}
+
+/* ============================================================== */
 /* --- Pure CSS Tailwind Equivalents for Gradio Compatibility --- */
 /* ============================================================== */
 .grid {{ display: grid !important; }}
@@ -1342,6 +1611,7 @@ html, body {{
 
 .flex {{ display: flex !important; }}
 .flex-col {{ flex-direction: column !important; }}
+.flex-wrap {{ flex-wrap: wrap !important; }}
 .items-center {{ align-items: center !important; }}
 .justify-center {{ justify-content: center !important; }}
 .justify-between {{ justify-content: space-between !important; }}
@@ -1465,7 +1735,7 @@ css = build_app_css(active_lang)
 with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(primary_hue="emerald", spacing_size="sm", text_size="sm"), css=css) as demo:
     with gr.Row(elem_classes=["hero-header"]):
         with gr.Column(scale=8):
-            gr.HTML(f"""
+            header_html = gr.HTML(f"""
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span style="font-size: 16px;">🎬</span>
                 <h1>{t("hero_title", active_lang)}</h1>
@@ -1476,41 +1746,30 @@ with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(prima
             <p>{t("hero_subtitle", active_lang)}</p>
             """)
         with gr.Column(scale=4):
-            with gr.Row(elem_classes=["items-center"]):
-                lang_selector = gr.Dropdown(
-                    label=t("language_label", active_lang),
+            with gr.Row(elem_classes=["items-center", "hero-controls-inner"], equal_height=True):
+                lang_selector = gr.Radio(
                     choices=[("English", "en"), ("العربية", "ar")],
                     value=active_lang,
-                    scale=2,
-                    elem_classes=["compact-field"]
+                    show_label=False,
+                    container=False,
+                    elem_classes=["lang-pill-switch"]
                 )
-                gr.HTML(f"""
-                <div style="display: flex; align-items: center; gap: 6px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-family: monospace; color: #0f172a; margin-top: 10px;">
+                system_badge_html = gr.HTML(f"""
+                <div class="cyber-status-badge" style="display: flex; align-items: center; gap: 6px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-family: monospace; color: #0f172a; white-space: nowrap;">
                     <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
                     <span>{t("system_online", active_lang)}</span>
                 </div>
                 """)
 
     current_config = load_config()
-
-    def handle_lang_switch(selected_lang):
-        save_language_preference(selected_lang)
-        return None
-
-    lang_selector.change(
-        fn=handle_lang_switch,
-        inputs=lang_selector,
-        outputs=None,
-        js="() => { window.location.reload(); }"
-    )
     
     with gr.Tabs():
         # ==============================================================
         # --- تبويبة 1: صناعة فيديو مفرد (شاشة حية متقدمة) ---
         # ==============================================================
-        with gr.TabItem(t("tab_single", active_lang)):
+        with gr.TabItem(t("tab_single", active_lang)) as tab_single_item:
             with gr.Column(elem_classes=["panel-card"]):
-                with gr.Row(equal_height=True):
+                with gr.Row(equal_height=True, elem_classes=["action-input-row"]):
                     single_topic_input = gr.Textbox(
                         label=t("single_topic_label", active_lang),
                         placeholder=t("single_topic_placeholder", active_lang),
@@ -1528,12 +1787,12 @@ with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(prima
         # ==============================================================
         # --- تبويبة 2: الإنتاج بالجملة (لوحة القيادة الحية) ---
         # ==============================================================
-        with gr.TabItem(t("tab_batch", active_lang)):
+        with gr.TabItem(t("tab_batch", active_lang)) as tab_batch_item:
             with gr.Column(elem_classes=["panel-card"]):
                 resume_alert = gr.Markdown(visible=False)
                 resume_btn = gr.Button(t("resume_btn", active_lang), variant="stop", visible=False, elem_classes=["btn-primary-action"])
                 
-                with gr.Row(equal_height=True):
+                with gr.Row(equal_height=True, elem_classes=["action-input-row"]):
                     json_file_input = gr.File(label=t("batch_file_label", active_lang), file_types=[".json", ".txt", "text"], scale=4, elem_classes=["compact-file-upload"])
                     batch_start_btn = gr.Button(t("batch_start_btn", active_lang), variant="primary", scale=1, elem_classes=["btn-primary-action"])
                 
@@ -1556,11 +1815,11 @@ with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(prima
         # ==============================================================
         # --- تبويبة 3: إدارة وسائط ومونتاج الفيديو ---
         # ==============================================================
-        with gr.TabItem(t("tab_assets", active_lang)):
-            with gr.Row():
+        with gr.TabItem(t("tab_assets", active_lang)) as tab_assets_item:
+            with gr.Row(elem_classes=["panel-columns-row"]):
                 with gr.Column(scale=1, elem_classes=["panel-card"]):
-                    gr.Markdown(f"<div class='panel-title'>{t('section_hook_gameplay', active_lang)}</div>")
-                    with gr.Row(equal_height=True):
+                    section_hook_md = gr.Markdown(f"<div class='panel-title'>{t('section_hook_gameplay', active_lang)}</div>")
+                    with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
                         gameplay_path_input = gr.Textbox(
                             label=t("gameplay_label", active_lang),
                             value=current_config.get("gameplay_path", ""),
@@ -1571,7 +1830,7 @@ with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(prima
                         )
                         gameplay_file_upload = gr.File(label=t("upload_btn_label", active_lang), file_types=[".mp4", ".mov", ".mkv"], scale=1, elem_classes=["compact-file-upload"])
                     
-                    with gr.Row(equal_height=True):
+                    with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
                         hook_dir_input = gr.Textbox(
                             label=t("hook_dir_label", active_lang),
                             value=current_config.get("hook_dir", ""),
@@ -1588,7 +1847,7 @@ with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(prima
                             elem_classes=["compact-file-upload"]
                         )
                     
-                    with gr.Row(equal_height=True):
+                    with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
                         hook_audio_input = gr.Textbox(
                             label=t("hook_audio_label", active_lang),
                             value=current_config.get("hook_audio_source", ""),
@@ -1600,8 +1859,8 @@ with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(prima
                         hook_audio_upload = gr.File(label=t("upload_btn_label", active_lang), file_types=[".mp4", ".mp3", ".wav", ".m4a"], scale=1, elem_classes=["compact-file-upload"])
 
                 with gr.Column(scale=1, elem_classes=["panel-card"]):
-                    gr.Markdown(f"<div class='panel-title'>{t('section_music_outro', active_lang)}</div>")
-                    with gr.Row(equal_height=True):
+                    section_music_md = gr.Markdown(f"<div class='panel-title'>{t('section_music_outro', active_lang)}</div>")
+                    with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
                         bg_music_input = gr.Textbox(
                             label=t("bg_music_label", active_lang),
                             value=current_config.get("bg_music_path", ""),
@@ -1612,7 +1871,7 @@ with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(prima
                         )
                         bg_music_upload = gr.File(label=t("upload_btn_label", active_lang), file_types=[".mp4", ".mp3", ".wav", ".m4a"], scale=1, elem_classes=["compact-file-upload"])
 
-                    with gr.Row(equal_height=True):
+                    with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
                         outro_path_input = gr.Textbox(
                             label=t("outro_label", active_lang),
                             value=current_config.get("outro_path", ""),
@@ -1630,10 +1889,10 @@ with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(prima
         # ==============================================================
         # --- تبويبة 4: إعدادات الذكاء الاصطناعي وتيليجرام ---
         # ==============================================================
-        with gr.TabItem(t("tab_settings", active_lang)):
-            with gr.Row():
+        with gr.TabItem(t("tab_settings", active_lang)) as tab_settings_item:
+            with gr.Row(elem_classes=["panel-columns-row"]):
                 with gr.Column(scale=1, elem_classes=["panel-card"]):
-                    gr.Markdown(f"<div class='panel-title'>{t('section_ai_voice', active_lang)}</div>")
+                    section_ai_md = gr.Markdown(f"<div class='panel-title'>{t('section_ai_voice', active_lang)}</div>")
                     api_url_input = gr.Textbox(
                         label=t("api_url_label", active_lang),
                         value=current_config.get("api_url", ""),
@@ -1667,7 +1926,7 @@ with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(prima
                     )
 
                 with gr.Column(scale=1, elem_classes=["panel-card"]):
-                    gr.Markdown(f"<div class='panel-title'>{t('section_telegram', active_lang)}</div>")
+                    section_tg_md = gr.Markdown(f"<div class='panel-title'>{t('section_telegram', active_lang)}</div>")
                     upload_telegram_checkbox = gr.Checkbox(
                         label=t("tg_checkbox_label", active_lang),
                         value=current_config.get("upload_to_telegram", True),
@@ -1692,6 +1951,93 @@ with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(prima
             with gr.Row():
                 save_api_btn = gr.Button(t("save_settings_btn", active_lang), variant="primary", elem_classes=["btn-primary-action"])
             save_api_status = gr.Markdown("")
+
+    # دالة الترجمة الفورية الحية لجميع عناصر الواجهة
+    def switch_language_live(selected_lang):
+        save_language_preference(selected_lang)
+        
+        new_header = f"""
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 16px;">🎬</span>
+            <h1>{t("hero_title", selected_lang)}</h1>
+            <span style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; font-family: monospace;">
+                {t("hero_badge", selected_lang)}
+            </span>
+        </div>
+        <p>{t("hero_subtitle", selected_lang)}</p>
+        """
+        
+        new_badge = f"""
+        <div class="cyber-status-badge" style="display: flex; align-items: center; gap: 6px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-family: monospace; color: #0f172a; white-space: nowrap;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
+            <span>{t("system_online", selected_lang)}</span>
+        </div>
+        """
+        
+        return [
+            header_html.update(value=new_header),
+            system_badge_html.update(value=new_badge),
+            tab_single_item.update(label=t("tab_single", selected_lang)),
+            single_topic_input.update(label=t("single_topic_label", selected_lang), placeholder=t("single_topic_placeholder", selected_lang)),
+            single_start_btn.update(value=t("single_start_btn", selected_lang)),
+            single_output_log.update(value=render_dashboard_html(mode="single", percentage=0, step_title=t("single_initial_step", selected_lang), topic=t("single_initial_topic", selected_lang))),
+            tab_batch_item.update(label=t("tab_batch", selected_lang)),
+            resume_btn.update(value=t("resume_btn", selected_lang)),
+            json_file_input.update(label=t("batch_file_label", selected_lang)),
+            batch_start_btn.update(value=t("batch_start_btn", selected_lang)),
+            batch_output_log.update(value=render_dashboard_html(mode="batch", percentage=0, step_title=t("batch_initial_step", selected_lang), topic=t("batch_initial_topic", selected_lang), batch_info={"pct": 0.0, "completed": 0, "current": 1, "remaining": 0, "avg_sec": "--"})),
+            tab_assets_item.update(label=t("tab_assets", selected_lang)),
+            section_hook_md.update(value=f"<div class='panel-title'>{t('section_hook_gameplay', selected_lang)}</div>"),
+            gameplay_path_input.update(label=t("gameplay_label", selected_lang), placeholder=t("gameplay_placeholder", selected_lang)),
+            gameplay_file_upload.update(label=t("upload_btn_label", selected_lang)),
+            hook_dir_input.update(label=t("hook_dir_label", selected_lang), placeholder=t("hook_dir_placeholder", selected_lang)),
+            hooks_folder_upload.update(label=t("upload_btn_label", selected_lang)),
+            hook_audio_input.update(label=t("hook_audio_label", selected_lang), placeholder=t("hook_audio_placeholder", selected_lang)),
+            hook_audio_upload.update(label=t("upload_btn_label", selected_lang)),
+            section_music_md.update(value=f"<div class='panel-title'>{t('section_music_outro', selected_lang)}</div>"),
+            bg_music_input.update(label=t("bg_music_label", selected_lang), placeholder=t("bg_music_placeholder", selected_lang)),
+            bg_music_upload.update(label=t("upload_btn_label", selected_lang)),
+            outro_path_input.update(label=t("outro_label", selected_lang), placeholder=t("outro_placeholder", selected_lang)),
+            outro_upload.update(label=t("upload_btn_label", selected_lang)),
+            save_assets_btn.update(value=t("save_assets_btn", selected_lang)),
+            tab_settings_item.update(label=t("tab_settings", selected_lang)),
+            section_ai_md.update(value=f"<div class='panel-title'>{t('section_ai_voice', selected_lang)}</div>"),
+            api_url_input.update(label=t("api_url_label", selected_lang)),
+            api_key_input.update(label=t("api_key_label", selected_lang)),
+            voice_input.update(label=t("voice_label", selected_lang)),
+            section_tg_md.update(value=f"<div class='panel-title'>{t('section_telegram', selected_lang)}</div>"),
+            upload_telegram_checkbox.update(label=t("tg_checkbox_label", selected_lang), info=t("tg_checkbox_info", selected_lang)),
+            bot_token_input.update(label=t("bot_token_label", selected_lang)),
+            channel_id_input.update(label=t("channel_id_label", selected_lang)),
+            save_api_btn.update(value=t("save_settings_btn", selected_lang))
+        ]
+
+    live_ui_outputs = [
+        header_html, system_badge_html,
+        tab_single_item, single_topic_input, single_start_btn, single_output_log,
+        tab_batch_item, resume_btn, json_file_input, batch_start_btn, batch_output_log,
+        tab_assets_item, section_hook_md, gameplay_path_input, gameplay_file_upload,
+        hook_dir_input, hooks_folder_upload, hook_audio_input, hook_audio_upload,
+        section_music_md, bg_music_input, bg_music_upload, outro_path_input, outro_upload, save_assets_btn,
+        tab_settings_item, section_ai_md, api_url_input, api_key_input, voice_input,
+        section_tg_md, upload_telegram_checkbox, bot_token_input, channel_id_input, save_api_btn
+    ]
+
+    # ربط التبديل الفوري مع ضبط اتجاه الصفحة ديناميكياً بدون ريلود
+    lang_selector.change(
+        fn=switch_language_live,
+        inputs=lang_selector,
+        outputs=live_ui_outputs,
+        js="""(selected_lang) => {
+            if (selected_lang === 'ar') {
+                document.documentElement.dir = 'rtl';
+                document.body.dir = 'rtl';
+            } else {
+                document.documentElement.dir = 'ltr';
+                document.body.dir = 'ltr';
+            }
+        }"""
+    )
 
     def do_save(api_url, api_key, bot_token, channel_id, upload_tg, voice, gp, hk_d, hk_s, bg, out):
         return save_config(api_url, api_key, bot_token, channel_id, upload_tg, voice, gp, hk_d, hk_s, bg, out)
