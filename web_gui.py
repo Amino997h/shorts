@@ -1953,20 +1953,6 @@ with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(prima
             save_api_status = gr.Markdown("")
 
     # دالة الترجمة الفورية الحية لجميع عناصر الواجهة
-    def switch_language_live(selected_lang):
-        save_language_preference(selected_lang)
-        
-        new_header = f"""
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 16px;">🎬</span>
-            <h1>{t("hero_title", selected_lang)}</h1>
-            <span style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; font-family: monospace;">
-                {t("hero_badge", selected_lang)}
-            </span>
-        </div>
-        <p>{t("hero_subtitle", selected_lang)}</p>
-        """
-        
     # تبديل اللغة السلس مع الحفظ وإعادة التحميل النظيف الفوري (بدون أي أخطاء وبدون فقدان التنسيق)
     def switch_language_live(selected_lang):
         try:
