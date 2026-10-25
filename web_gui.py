@@ -1064,11 +1064,11 @@ html, body {{
     text-align: {page_align};
 }}
 
-[dir="rtl"], [dir="rtl"] .gradio-container {{
+[dir="rtl"], [dir="rtl"] .gradio-container, html[dir="rtl"] body {{
     direction: rtl !important;
     text-align: right !important;
 }}
-[dir="ltr"], [dir="ltr"] .gradio-container {{
+[dir="ltr"], [dir="ltr"] .gradio-container, html[dir="ltr"] body {{
     direction: ltr !important;
     text-align: left !important;
 }}
@@ -1732,19 +1732,30 @@ html, body {{
 active_lang = get_current_lang()
 css = build_app_css(active_lang)
 
+def get_header_markup(lang):
+    return f'''
+    <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 16px;">🎬</span>
+        <h1>{t("hero_title", lang)}</h1>
+        <span style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; font-family: monospace;">
+            {t("hero_badge", lang)}
+        </span>
+    </div>
+    <p>{t("hero_subtitle", lang)}</p>
+    '''
+
+def get_badge_markup(lang):
+    return f'''
+    <div class="cyber-status-badge" style="display: flex; align-items: center; gap: 6px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-family: monospace; color: #0f172a; white-space: nowrap;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
+        <span>{t("system_online", lang)}</span>
+    </div>
+    '''
+
 with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(primary_hue="emerald", spacing_size="sm", text_size="sm"), css=css) as demo:
     with gr.Row(elem_classes=["hero-header"]):
         with gr.Column(scale=8):
-            header_html = gr.HTML(f"""
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 16px;">🎬</span>
-                <h1>{t("hero_title", active_lang)}</h1>
-                <span style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; font-family: monospace;">
-                    {t("hero_badge", active_lang)}
-                </span>
-            </div>
-            <p>{t("hero_subtitle", active_lang)}</p>
-            """)
+            header_html = gr.HTML(get_header_markup(active_lang))
         with gr.Column(scale=4):
             with gr.Row(elem_classes=["items-center", "hero-controls-inner"], equal_height=True):
                 lang_selector = gr.Radio(
@@ -1754,207 +1765,363 @@ with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(prima
                     container=False,
                     elem_classes=["lang-pill-switch"]
                 )
-                system_badge_html = gr.HTML(f"""
-                <div class="cyber-status-badge" style="display: flex; align-items: center; gap: 6px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-family: monospace; color: #0f172a; white-space: nowrap;">
-                    <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
-                    <span>{t("system_online", active_lang)}</span>
-                </div>
-                """)
+                system_badge_html = gr.HTML(get_badge_markup(active_lang))
 
     current_config = load_config()
-    
-    with gr.Tabs():
-        # ==============================================================
-        # --- تبويبة 1: صناعة فيديو مفرد (شاشة حية متقدمة) ---
-        # ==============================================================
-        with gr.TabItem(t("tab_single", active_lang)) as tab_single_item:
-            with gr.Column(elem_classes=["panel-card"]):
-                with gr.Row(equal_height=True, elem_classes=["action-input-row"]):
-                    single_topic_input = gr.Textbox(
-                        label=t("single_topic_label", active_lang),
-                        placeholder=t("single_topic_placeholder", active_lang),
-                        scale=5,
-                        lines=1,
-                        elem_classes=["compact-field"]
-                    )
-                    single_start_btn = gr.Button(t("single_start_btn", active_lang), variant="primary", scale=1, elem_classes=["btn-primary-action"])
-            
-            single_output_log = gr.HTML(
-                value=render_dashboard_html(mode="single", percentage=0, step_title=t("single_initial_step", active_lang), topic=t("single_initial_topic", active_lang))
-            )
-            single_start_btn.click(fn=run_single_topic, inputs=single_topic_input, outputs=single_output_log)
 
-        # ==============================================================
-        # --- تبويبة 2: الإنتاج بالجملة (لوحة القيادة الحية) ---
-        # ==============================================================
-        with gr.TabItem(t("tab_batch", active_lang)) as tab_batch_item:
-            with gr.Column(elem_classes=["panel-card"]):
-                resume_alert = gr.Markdown(visible=False)
-                resume_btn = gr.Button(t("resume_btn", active_lang), variant="stop", visible=False, elem_classes=["btn-primary-action"])
-                
-                with gr.Row(equal_height=True, elem_classes=["action-input-row"]):
-                    json_file_input = gr.File(label=t("batch_file_label", active_lang), file_types=[".json", ".txt", "text"], scale=4, elem_classes=["compact-file-upload"])
-                    batch_start_btn = gr.Button(t("batch_start_btn", active_lang), variant="primary", scale=1, elem_classes=["btn-primary-action"])
-                
-            batch_output_log = gr.HTML(
-                value=render_dashboard_html(
-                    mode="batch",
-                    percentage=0,
-                    step_title=t("batch_initial_step", active_lang),
-                    topic=t("batch_initial_topic", active_lang),
-                    batch_info={"pct": 0.0, "completed": 0, "current": 1, "remaining": 0, "avg_sec": "--"}
+    voice_choices = [
+        "en-US-GuyNeural - en-US (Male)",
+        "en-US-ChristopherNeural - en-US (Male)",
+        "en-US-JennyNeural - en-US (Female)",
+        "en-US-BrianMultilingualNeural - en-US (Male)",
+        "en-US-AriaNeural - en-US (Female)"
+    ]
+    current_voice = current_config.get("voice", "en-US-GuyNeural - en-US (Male)")
+    if current_voice not in voice_choices:
+        voice_choices.insert(0, current_voice)
+
+    # ==============================================================
+    # --- Native Dual-View Architecture (100% Zero-Reload Instant I18n) ---
+    # ==============================================================
+
+    # Container 1: English View
+    with gr.Column(visible=(active_lang == "en"), elem_id="view-container-en") as container_en:
+        with gr.Tabs():
+            # Tab 1: Single Video Production (EN)
+            with gr.TabItem(t("tab_single", "en")):
+                with gr.Column(elem_classes=["panel-card"]):
+                    with gr.Row(equal_height=True, elem_classes=["action-input-row"]):
+                        single_topic_input_en = gr.Textbox(
+                            label=t("single_topic_label", "en"),
+                            placeholder=t("single_topic_placeholder", "en"),
+                            scale=5,
+                            lines=1,
+                            elem_classes=["compact-field"]
+                        )
+                        single_start_btn_en = gr.Button(t("single_start_btn", "en"), variant="primary", scale=1, elem_classes=["btn-primary-action"])
+
+                single_output_log_en = gr.HTML(
+                    value=render_dashboard_html(mode="single", percentage=0, step_title=t("single_initial_step", "en"), topic=t("single_initial_topic", "en"), lang="en")
                 )
-            )
-            
-            batch_start_btn.click(fn=run_batch_topics, inputs=json_file_input, outputs=batch_output_log)
-            resume_btn.click(fn=resume_batch, outputs=batch_output_log)
-            
-            demo.load(fn=check_resume_status, outputs=resume_alert)
-            demo.load(fn=lambda: gr.update(visible=True) if load_state().get("in_progress") else gr.update(visible=False), outputs=resume_btn)
 
-        # ==============================================================
-        # --- تبويبة 3: إدارة وسائط ومونتاج الفيديو ---
-        # ==============================================================
-        with gr.TabItem(t("tab_assets", active_lang)) as tab_assets_item:
-            with gr.Row(elem_classes=["panel-columns-row"]):
-                with gr.Column(scale=1, elem_classes=["panel-card"]):
-                    section_hook_md = gr.Markdown(f"<div class='panel-title'>{t('section_hook_gameplay', active_lang)}</div>")
-                    with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
-                        gameplay_path_input = gr.Textbox(
-                            label=t("gameplay_label", active_lang),
-                            value=current_config.get("gameplay_path", ""),
-                            placeholder=t("gameplay_placeholder", active_lang),
-                            scale=4,
+            # Tab 2: Batch Production (EN)
+            with gr.TabItem(t("tab_batch", "en")):
+                with gr.Column(elem_classes=["panel-card"]):
+                    resume_alert_en = gr.Markdown(visible=False)
+                    resume_btn_en = gr.Button(t("resume_btn", "en"), variant="stop", visible=False, elem_classes=["btn-primary-action"])
+
+                    with gr.Row(equal_height=True, elem_classes=["action-input-row"]):
+                        json_file_input_en = gr.File(label=t("batch_file_label", "en"), file_types=[".json", ".txt", "text"], scale=4, elem_classes=["compact-file-upload"])
+                        batch_start_btn_en = gr.Button(t("batch_start_btn", "en"), variant="primary", scale=1, elem_classes=["btn-primary-action"])
+
+                batch_output_log_en = gr.HTML(
+                    value=render_dashboard_html(
+                        mode="batch",
+                        percentage=0,
+                        step_title=t("batch_initial_step", "en"),
+                        topic=t("batch_initial_topic", "en"),
+                        batch_info={"pct": 0.0, "completed": 0, "current": 1, "remaining": 0, "avg_sec": "--"},
+                        lang="en"
+                    )
+                )
+
+            # Tab 3: Media & Assets Management (EN)
+            with gr.TabItem(t("tab_assets", "en")):
+                with gr.Row(elem_classes=["panel-columns-row"]):
+                    with gr.Column(scale=1, elem_classes=["panel-card"]):
+                        gr.Markdown(f"<div class='panel-title'>{t('section_hook_gameplay', 'en')}</div>")
+                        with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
+                            gameplay_path_input_en = gr.Textbox(
+                                label=t("gameplay_label", "en"),
+                                value=current_config.get("gameplay_path", ""),
+                                placeholder=t("gameplay_placeholder", "en"),
+                                scale=4,
+                                lines=1,
+                                elem_classes=["compact-field"]
+                            )
+                            gameplay_file_upload_en = gr.File(label=t("upload_btn_label", "en"), file_types=[".mp4", ".mov", ".mkv"], scale=1, elem_classes=["compact-file-upload"])
+
+                        with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
+                            hook_dir_input_en = gr.Textbox(
+                                label=t("hook_dir_label", "en"),
+                                value=current_config.get("hook_dir", ""),
+                                placeholder=t("hook_dir_placeholder", "en"),
+                                scale=4,
+                                lines=1,
+                                elem_classes=["compact-field"]
+                            )
+                            hooks_folder_upload_en = gr.File(
+                                label=t("upload_btn_label", "en"),
+                                file_count="multiple",
+                                file_types=[".mp4", ".mov", ".mkv"],
+                                scale=1,
+                                elem_classes=["compact-file-upload"]
+                            )
+
+                        with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
+                            hook_audio_input_en = gr.Textbox(
+                                label=t("hook_audio_label", "en"),
+                                value=current_config.get("hook_audio_source", ""),
+                                placeholder=t("hook_audio_placeholder", "en"),
+                                scale=4,
+                                lines=1,
+                                elem_classes=["compact-field"]
+                            )
+                            hook_audio_upload_en = gr.File(label=t("upload_btn_label", "en"), file_types=[".mp4", ".mp3", ".wav", ".m4a"], scale=1, elem_classes=["compact-file-upload"])
+
+                    with gr.Column(scale=1, elem_classes=["panel-card"]):
+                        gr.Markdown(f"<div class='panel-title'>{t('section_music_outro', 'en')}</div>")
+                        with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
+                            bg_music_input_en = gr.Textbox(
+                                label=t("bg_music_label", "en"),
+                                value=current_config.get("bg_music_path", ""),
+                                placeholder=t("bg_music_placeholder", "en"),
+                                scale=4,
+                                lines=1,
+                                elem_classes=["compact-field"]
+                            )
+                            bg_music_upload_en = gr.File(label=t("upload_btn_label", "en"), file_types=[".mp4", ".mp3", ".wav", ".m4a"], scale=1, elem_classes=["compact-file-upload"])
+
+                        with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
+                            outro_path_input_en = gr.Textbox(
+                                label=t("outro_label", "en"),
+                                value=current_config.get("outro_path", ""),
+                                placeholder=t("outro_placeholder", "en"),
+                                scale=4,
+                                lines=1,
+                                elem_classes=["compact-field"]
+                            )
+                            outro_upload_en = gr.File(label=t("upload_btn_label", "en"), file_types=[".mp4", ".mov", ".mkv"], scale=1, elem_classes=["compact-file-upload"])
+
+                        with gr.Row():
+                            save_assets_btn_en = gr.Button(t("save_assets_btn", "en"), variant="primary", elem_classes=["btn-primary-action"])
+                        save_assets_status_en = gr.Markdown("")
+
+            # Tab 4: AI & Telegram Settings (EN)
+            with gr.TabItem(t("tab_settings", "en")):
+                with gr.Row(elem_classes=["panel-columns-row"]):
+                    with gr.Column(scale=1, elem_classes=["panel-card"]):
+                        gr.Markdown(f"<div class='panel-title'>{t('section_ai_voice', 'en')}</div>")
+                        api_url_input_en = gr.Textbox(
+                            label=t("api_url_label", "en"),
+                            value=current_config.get("api_url", ""),
+                            placeholder="http://127.0.0.1:8008/v1/chat/completions",
                             lines=1,
                             elem_classes=["compact-field"]
                         )
-                        gameplay_file_upload = gr.File(label=t("upload_btn_label", active_lang), file_types=[".mp4", ".mov", ".mkv"], scale=1, elem_classes=["compact-file-upload"])
-                    
-                    with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
-                        hook_dir_input = gr.Textbox(
-                            label=t("hook_dir_label", active_lang),
-                            value=current_config.get("hook_dir", ""),
-                            placeholder=t("hook_dir_placeholder", active_lang),
-                            scale=4,
+                        api_key_input_en = gr.Textbox(
+                            label=t("api_key_label", "en"),
+                            value=current_config.get("api_key", ""),
+                            type="password",
+                            placeholder="sk-...",
                             lines=1,
                             elem_classes=["compact-field"]
                         )
-                        hooks_folder_upload = gr.File(
-                            label=t("upload_btn_label", active_lang),
-                            file_count="multiple",
-                            file_types=[".mp4", ".mov", ".mkv"],
-                            scale=1,
-                            elem_classes=["compact-file-upload"]
+                        voice_input_en = gr.Dropdown(
+                            label=t("voice_label", "en"),
+                            choices=voice_choices,
+                            value=current_voice,
+                            elem_classes=["compact-field"]
                         )
-                    
-                    with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
-                        hook_audio_input = gr.Textbox(
-                            label=t("hook_audio_label", active_lang),
-                            value=current_config.get("hook_audio_source", ""),
-                            placeholder=t("hook_audio_placeholder", active_lang),
-                            scale=4,
+
+                    with gr.Column(scale=1, elem_classes=["panel-card"]):
+                        gr.Markdown(f"<div class='panel-title'>{t('section_telegram', 'en')}</div>")
+                        upload_telegram_checkbox_en = gr.Checkbox(
+                            label=t("tg_checkbox_label", "en"),
+                            value=current_config.get("upload_to_telegram", True),
+                            info=t("tg_checkbox_info", "en")
+                        )
+                        bot_token_input_en = gr.Textbox(
+                            label=t("bot_token_label", "en"),
+                            value=current_config.get("bot_token", ""),
+                            type="password",
+                            placeholder="YOUR_TELEGRAM_BOT_TOKEN",
                             lines=1,
                             elem_classes=["compact-field"]
                         )
-                        hook_audio_upload = gr.File(label=t("upload_btn_label", active_lang), file_types=[".mp4", ".mp3", ".wav", ".m4a"], scale=1, elem_classes=["compact-file-upload"])
-
-                with gr.Column(scale=1, elem_classes=["panel-card"]):
-                    section_music_md = gr.Markdown(f"<div class='panel-title'>{t('section_music_outro', active_lang)}</div>")
-                    with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
-                        bg_music_input = gr.Textbox(
-                            label=t("bg_music_label", active_lang),
-                            value=current_config.get("bg_music_path", ""),
-                            placeholder=t("bg_music_placeholder", active_lang),
-                            scale=4,
+                        channel_id_input_en = gr.Textbox(
+                            label=t("channel_id_label", "en"),
+                            value=current_config.get("channel_id", ""),
+                            placeholder="YOUR_TELEGRAM_CHANNEL_ID",
                             lines=1,
                             elem_classes=["compact-field"]
                         )
-                        bg_music_upload = gr.File(label=t("upload_btn_label", active_lang), file_types=[".mp4", ".mp3", ".wav", ".m4a"], scale=1, elem_classes=["compact-file-upload"])
 
-                    with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
-                        outro_path_input = gr.Textbox(
-                            label=t("outro_label", active_lang),
-                            value=current_config.get("outro_path", ""),
-                            placeholder=t("outro_placeholder", active_lang),
-                            scale=4,
+                with gr.Row():
+                    save_api_btn_en = gr.Button(t("save_settings_btn", "en"), variant="primary", elem_classes=["btn-primary-action"])
+                save_api_status_en = gr.Markdown("")
+
+    # Container 2: Arabic View
+    with gr.Column(visible=(active_lang == "ar"), elem_id="view-container-ar") as container_ar:
+        with gr.Tabs():
+            # Tab 1: إنتاج فيديو مفرد (AR)
+            with gr.TabItem(t("tab_single", "ar")):
+                with gr.Column(elem_classes=["panel-card"]):
+                    with gr.Row(equal_height=True, elem_classes=["action-input-row"]):
+                        single_topic_input_ar = gr.Textbox(
+                            label=t("single_topic_label", "ar"),
+                            placeholder=t("single_topic_placeholder", "ar"),
+                            scale=5,
                             lines=1,
                             elem_classes=["compact-field"]
                         )
-                        outro_upload = gr.File(label=t("upload_btn_label", active_lang), file_types=[".mp4", ".mov", ".mkv"], scale=1, elem_classes=["compact-file-upload"])
+                        single_start_btn_ar = gr.Button(t("single_start_btn", "ar"), variant="primary", scale=1, elem_classes=["btn-primary-action"])
 
-                    with gr.Row():
-                        save_assets_btn = gr.Button(t("save_assets_btn", active_lang), variant="primary", elem_classes=["btn-primary-action"])
-                    save_assets_status = gr.Markdown("")
+                single_output_log_ar = gr.HTML(
+                    value=render_dashboard_html(mode="single", percentage=0, step_title=t("single_initial_step", "ar"), topic=t("single_initial_topic", "ar"), lang="ar")
+                )
 
-        # ==============================================================
-        # --- تبويبة 4: إعدادات الذكاء الاصطناعي وتيليجرام ---
-        # ==============================================================
-        with gr.TabItem(t("tab_settings", active_lang)) as tab_settings_item:
-            with gr.Row(elem_classes=["panel-columns-row"]):
-                with gr.Column(scale=1, elem_classes=["panel-card"]):
-                    section_ai_md = gr.Markdown(f"<div class='panel-title'>{t('section_ai_voice', active_lang)}</div>")
-                    api_url_input = gr.Textbox(
-                        label=t("api_url_label", active_lang),
-                        value=current_config.get("api_url", ""),
-                        placeholder="http://127.0.0.1:8008/v1/chat/completions",
-                        lines=1,
-                        elem_classes=["compact-field"]
-                    )
-                    api_key_input = gr.Textbox(
-                        label=t("api_key_label", active_lang),
-                        value=current_config.get("api_key", ""),
-                        type="password",
-                        placeholder="sk-...",
-                        lines=1,
-                        elem_classes=["compact-field"]
-                    )
-                    voice_choices = [
-                        "en-US-GuyNeural - en-US (Male)",
-                        "en-US-ChristopherNeural - en-US (Male)",
-                        "en-US-JennyNeural - en-US (Female)",
-                        "en-US-BrianMultilingualNeural - en-US (Male)",
-                        "en-US-AriaNeural - en-US (Female)"
-                    ]
-                    current_voice = current_config.get("voice", "en-US-GuyNeural - en-US (Male)")
-                    if current_voice not in voice_choices:
-                        voice_choices.insert(0, current_voice)
-                    voice_input = gr.Dropdown(
-                        label=t("voice_label", active_lang),
-                        choices=voice_choices,
-                        value=current_voice,
-                        elem_classes=["compact-field"]
-                    )
+            # Tab 2: إنتاج بالجملة (AR)
+            with gr.TabItem(t("tab_batch", "ar")):
+                with gr.Column(elem_classes=["panel-card"]):
+                    resume_alert_ar = gr.Markdown(visible=False)
+                    resume_btn_ar = gr.Button(t("resume_btn", "ar"), variant="stop", visible=False, elem_classes=["btn-primary-action"])
 
-                with gr.Column(scale=1, elem_classes=["panel-card"]):
-                    section_tg_md = gr.Markdown(f"<div class='panel-title'>{t('section_telegram', active_lang)}</div>")
-                    upload_telegram_checkbox = gr.Checkbox(
-                        label=t("tg_checkbox_label", active_lang),
-                        value=current_config.get("upload_to_telegram", True),
-                        info=t("tg_checkbox_info", active_lang)
-                    )
-                    bot_token_input = gr.Textbox(
-                        label=t("bot_token_label", active_lang),
-                        value=current_config.get("bot_token", ""),
-                        type="password",
-                        placeholder="YOUR_TELEGRAM_BOT_TOKEN",
-                        lines=1,
-                        elem_classes=["compact-field"]
-                    )
-                    channel_id_input = gr.Textbox(
-                        label=t("channel_id_label", active_lang),
-                        value=current_config.get("channel_id", ""),
-                        placeholder="YOUR_TELEGRAM_CHANNEL_ID",
-                        lines=1,
-                        elem_classes=["compact-field"]
-                    )
+                    with gr.Row(equal_height=True, elem_classes=["action-input-row"]):
+                        json_file_input_ar = gr.File(label=t("batch_file_label", "ar"), file_types=[".json", ".txt", "text"], scale=4, elem_classes=["compact-file-upload"])
+                        batch_start_btn_ar = gr.Button(t("batch_start_btn", "ar"), variant="primary", scale=1, elem_classes=["btn-primary-action"])
 
-            with gr.Row():
-                save_api_btn = gr.Button(t("save_settings_btn", active_lang), variant="primary", elem_classes=["btn-primary-action"])
-            save_api_status = gr.Markdown("")
+                batch_output_log_ar = gr.HTML(
+                    value=render_dashboard_html(
+                        mode="batch",
+                        percentage=0,
+                        step_title=t("batch_initial_step", "ar"),
+                        topic=t("batch_initial_topic", "ar"),
+                        batch_info={"pct": 0.0, "completed": 0, "current": 1, "remaining": 0, "avg_sec": "--"},
+                        lang="ar"
+                    )
+                )
 
-    # دالة الترجمة الفورية الحية لجميع عناصر الواجهة
-    # تبديل اللغة السلس مع الحفظ وإعادة التحميل النظيف الفوري (بدون أي أخطاء وبدون فقدان التنسيق)
-    def switch_language_live(selected_lang):
+            # Tab 3: وسائط ومقاطع المونتاج (AR)
+            with gr.TabItem(t("tab_assets", "ar")):
+                with gr.Row(elem_classes=["panel-columns-row"]):
+                    with gr.Column(scale=1, elem_classes=["panel-card"]):
+                        gr.Markdown(f"<div class='panel-title'>{t('section_hook_gameplay', 'ar')}</div>")
+                        with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
+                            gameplay_path_input_ar = gr.Textbox(
+                                label=t("gameplay_label", "ar"),
+                                value=current_config.get("gameplay_path", ""),
+                                placeholder=t("gameplay_placeholder", "ar"),
+                                scale=4,
+                                lines=1,
+                                elem_classes=["compact-field"]
+                            )
+                            gameplay_file_upload_ar = gr.File(label=t("upload_btn_label", "ar"), file_types=[".mp4", ".mov", ".mkv"], scale=1, elem_classes=["compact-file-upload"])
+
+                        with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
+                            hook_dir_input_ar = gr.Textbox(
+                                label=t("hook_dir_label", "ar"),
+                                value=current_config.get("hook_dir", ""),
+                                placeholder=t("hook_dir_placeholder", "ar"),
+                                scale=4,
+                                lines=1,
+                                elem_classes=["compact-field"]
+                            )
+                            hooks_folder_upload_ar = gr.File(
+                                label=t("upload_btn_label", "ar"),
+                                file_count="multiple",
+                                file_types=[".mp4", ".mov", ".mkv"],
+                                scale=1,
+                                elem_classes=["compact-file-upload"]
+                            )
+
+                        with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
+                            hook_audio_input_ar = gr.Textbox(
+                                label=t("hook_audio_label", "ar"),
+                                value=current_config.get("hook_audio_source", ""),
+                                placeholder=t("hook_audio_placeholder", "ar"),
+                                scale=4,
+                                lines=1,
+                                elem_classes=["compact-field"]
+                            )
+                            hook_audio_upload_ar = gr.File(label=t("upload_btn_label", "ar"), file_types=[".mp4", ".mp3", ".wav", ".m4a"], scale=1, elem_classes=["compact-file-upload"])
+
+                    with gr.Column(scale=1, elem_classes=["panel-card"]):
+                        gr.Markdown(f"<div class='panel-title'>{t('section_music_outro', 'ar')}</div>")
+                        with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
+                            bg_music_input_ar = gr.Textbox(
+                                label=t("bg_music_label", "ar"),
+                                value=current_config.get("bg_music_path", ""),
+                                placeholder=t("bg_music_placeholder", "ar"),
+                                scale=4,
+                                lines=1,
+                                elem_classes=["compact-field"]
+                            )
+                            bg_music_upload_ar = gr.File(label=t("upload_btn_label", "ar"), file_types=[".mp4", ".mp3", ".wav", ".m4a"], scale=1, elem_classes=["compact-file-upload"])
+
+                        with gr.Row(equal_height=True, elem_classes=["asset-upload-row"]):
+                            outro_path_input_ar = gr.Textbox(
+                                label=t("outro_label", "ar"),
+                                value=current_config.get("outro_path", ""),
+                                placeholder=t("outro_placeholder", "ar"),
+                                scale=4,
+                                lines=1,
+                                elem_classes=["compact-field"]
+                            )
+                            outro_upload_ar = gr.File(label=t("upload_btn_label", "ar"), file_types=[".mp4", ".mov", ".mkv"], scale=1, elem_classes=["compact-file-upload"])
+
+                        with gr.Row():
+                            save_assets_btn_ar = gr.Button(t("save_assets_btn", "ar"), variant="primary", elem_classes=["btn-primary-action"])
+                        save_assets_status_ar = gr.Markdown("")
+
+            # Tab 4: الإعدادات الأساسية وتيليجرام (AR)
+            with gr.TabItem(t("tab_settings", "ar")):
+                with gr.Row(elem_classes=["panel-columns-row"]):
+                    with gr.Column(scale=1, elem_classes=["panel-card"]):
+                        gr.Markdown(f"<div class='panel-title'>{t('section_ai_voice', 'ar')}</div>")
+                        api_url_input_ar = gr.Textbox(
+                            label=t("api_url_label", "ar"),
+                            value=current_config.get("api_url", ""),
+                            placeholder="http://127.0.0.1:8008/v1/chat/completions",
+                            lines=1,
+                            elem_classes=["compact-field"]
+                        )
+                        api_key_input_ar = gr.Textbox(
+                            label=t("api_key_label", "ar"),
+                            value=current_config.get("api_key", ""),
+                            type="password",
+                            placeholder="sk-...",
+                            lines=1,
+                            elem_classes=["compact-field"]
+                        )
+                        voice_input_ar = gr.Dropdown(
+                            label=t("voice_label", "ar"),
+                            choices=voice_choices,
+                            value=current_voice,
+                            elem_classes=["compact-field"]
+                        )
+
+                    with gr.Column(scale=1, elem_classes=["panel-card"]):
+                        gr.Markdown(f"<div class='panel-title'>{t('section_telegram', 'ar')}</div>")
+                        upload_telegram_checkbox_ar = gr.Checkbox(
+                            label=t("tg_checkbox_label", "ar"),
+                            value=current_config.get("upload_to_telegram", True),
+                            info=t("tg_checkbox_info", "ar")
+                        )
+                        bot_token_input_ar = gr.Textbox(
+                            label=t("bot_token_label", "ar"),
+                            value=current_config.get("bot_token", ""),
+                            type="password",
+                            placeholder="YOUR_TELEGRAM_BOT_TOKEN",
+                            lines=1,
+                            elem_classes=["compact-field"]
+                        )
+                        channel_id_input_ar = gr.Textbox(
+                            label=t("channel_id_label", "ar"),
+                            value=current_config.get("channel_id", ""),
+                            placeholder="YOUR_TELEGRAM_CHANNEL_ID",
+                            lines=1,
+                            elem_classes=["compact-field"]
+                        )
+
+                with gr.Row():
+                    save_api_btn_ar = gr.Button(t("save_settings_btn", "ar"), variant="primary", elem_classes=["btn-primary-action"])
+                save_api_status_ar = gr.Markdown("")
+
+    # -------------------------------------------------------------
+    # Instant Language Switcher (0ms Latency, Zero Reload, Full Sync)
+    # -------------------------------------------------------------
+    def switch_language_instant(selected_lang):
         try:
             cfg = {}
             if os.path.exists(CONFIG_FILE):
@@ -1965,36 +2132,118 @@ with gr.Blocks(title=t("page_title", active_lang), theme=gr.themes.Default(prima
                 json.dump(cfg, f, indent=4, ensure_ascii=False)
         except Exception as e:
             print(f"Error persisting language: {e}")
-        return None
+
+        is_en = (selected_lang == "en")
+        is_ar = (selected_lang == "ar")
+        return (
+            gr.update(visible=is_en),
+            gr.update(visible=is_ar),
+            get_header_markup(selected_lang),
+            get_badge_markup(selected_lang)
+        )
 
     lang_selector.change(
-        fn=switch_language_live,
+        fn=switch_language_instant,
         inputs=lang_selector,
-        outputs=None,
+        outputs=[container_en, container_ar, header_html, system_badge_html],
         js="""(selected_lang) => {
-            if (selected_lang === 'ar') {
-                document.documentElement.dir = 'rtl';
-                document.body.dir = 'rtl';
-            } else {
-                document.documentElement.dir = 'ltr';
-                document.body.dir = 'ltr';
-            }
-            setTimeout(() => {
-                window.location.reload();
-            }, 120);
+            var dir = (selected_lang === 'ar') ? 'rtl' : 'ltr';
+            document.documentElement.dir = dir;
+            document.documentElement.setAttribute('dir', dir);
+            document.body.dir = dir;
+            document.body.setAttribute('dir', dir);
         }"""
     )
 
-    def do_save(api_url, api_key, bot_token, channel_id, upload_tg, voice, gp, hk_d, hk_s, bg, out):
-        return save_config(api_url, api_key, bot_token, channel_id, upload_tg, voice, gp, hk_d, hk_s, bg, out)
+    # -------------------------------------------------------------
+    # Two-Way Field Synchronization (Keeps EN and AR forms in sync)
+    # -------------------------------------------------------------
+    single_topic_input_en.input(fn=lambda v: v, inputs=single_topic_input_en, outputs=single_topic_input_ar)
+    single_topic_input_ar.input(fn=lambda v: v, inputs=single_topic_input_ar, outputs=single_topic_input_en)
 
-    all_inputs = [
-        api_url_input, api_key_input, bot_token_input, channel_id_input, upload_telegram_checkbox, voice_input,
-        gameplay_path_input, hook_dir_input, hook_audio_input, bg_music_input, outro_path_input
+    gameplay_path_input_en.input(fn=lambda v: v, inputs=gameplay_path_input_en, outputs=gameplay_path_input_ar)
+    gameplay_path_input_ar.input(fn=lambda v: v, inputs=gameplay_path_input_ar, outputs=gameplay_path_input_en)
+
+    hook_dir_input_en.input(fn=lambda v: v, inputs=hook_dir_input_en, outputs=hook_dir_input_ar)
+    hook_dir_input_ar.input(fn=lambda v: v, inputs=hook_dir_input_ar, outputs=hook_dir_input_en)
+
+    hook_audio_input_en.input(fn=lambda v: v, inputs=hook_audio_input_en, outputs=hook_audio_input_ar)
+    hook_audio_input_ar.input(fn=lambda v: v, inputs=hook_audio_input_ar, outputs=hook_audio_input_en)
+
+    bg_music_input_en.input(fn=lambda v: v, inputs=bg_music_input_en, outputs=bg_music_input_ar)
+    bg_music_input_ar.input(fn=lambda v: v, inputs=bg_music_input_ar, outputs=bg_music_input_en)
+
+    outro_path_input_en.input(fn=lambda v: v, inputs=outro_path_input_en, outputs=outro_path_input_ar)
+    outro_path_input_ar.input(fn=lambda v: v, inputs=outro_path_input_ar, outputs=outro_path_input_en)
+
+    api_url_input_en.input(fn=lambda v: v, inputs=api_url_input_en, outputs=api_url_input_ar)
+    api_url_input_ar.input(fn=lambda v: v, inputs=api_url_input_ar, outputs=api_url_input_en)
+
+    api_key_input_en.input(fn=lambda v: v, inputs=api_key_input_en, outputs=api_key_input_ar)
+    api_key_input_ar.input(fn=lambda v: v, inputs=api_key_input_ar, outputs=api_key_input_en)
+
+    voice_input_en.change(fn=lambda v: v, inputs=voice_input_en, outputs=voice_input_ar)
+    voice_input_ar.change(fn=lambda v: v, inputs=voice_input_ar, outputs=voice_input_en)
+
+    upload_telegram_checkbox_en.change(fn=lambda v: v, inputs=upload_telegram_checkbox_en, outputs=upload_telegram_checkbox_ar)
+    upload_telegram_checkbox_ar.change(fn=lambda v: v, inputs=upload_telegram_checkbox_ar, outputs=upload_telegram_checkbox_en)
+
+    bot_token_input_en.input(fn=lambda v: v, inputs=bot_token_input_en, outputs=bot_token_input_ar)
+    bot_token_input_ar.input(fn=lambda v: v, inputs=bot_token_input_ar, outputs=bot_token_input_en)
+
+    channel_id_input_en.input(fn=lambda v: v, inputs=channel_id_input_en, outputs=channel_id_input_ar)
+    channel_id_input_ar.input(fn=lambda v: v, inputs=channel_id_input_ar, outputs=channel_id_input_en)
+
+    # -------------------------------------------------------------
+    # Production Execution Pipelines (Synchronized to dual logs)
+    # -------------------------------------------------------------
+    def run_single_topic_dual(topic):
+        for update in run_single_topic(topic):
+            yield update, update
+
+    single_start_btn_en.click(fn=run_single_topic_dual, inputs=single_topic_input_en, outputs=[single_output_log_en, single_output_log_ar])
+    single_start_btn_ar.click(fn=run_single_topic_dual, inputs=single_topic_input_ar, outputs=[single_output_log_ar, single_output_log_en])
+
+    def run_batch_topics_dual(file_obj):
+        for update in run_batch_topics(file_obj):
+            yield update, update
+
+    def resume_batch_dual():
+        for update in resume_batch():
+            yield update, update
+
+    batch_start_btn_en.click(fn=run_batch_topics_dual, inputs=json_file_input_en, outputs=[batch_output_log_en, batch_output_log_ar])
+    batch_start_btn_ar.click(fn=run_batch_topics_dual, inputs=json_file_input_ar, outputs=[batch_output_log_ar, batch_output_log_en])
+
+    resume_btn_en.click(fn=resume_batch_dual, outputs=[batch_output_log_en, batch_output_log_ar])
+    resume_btn_ar.click(fn=resume_batch_dual, outputs=[batch_output_log_ar, batch_output_log_en])
+
+    demo.load(fn=check_resume_status, outputs=resume_alert_en)
+    demo.load(fn=check_resume_status, outputs=resume_alert_ar)
+    demo.load(fn=lambda: gr.update(visible=True) if load_state().get("in_progress") else gr.update(visible=False), outputs=resume_btn_en)
+    demo.load(fn=lambda: gr.update(visible=True) if load_state().get("in_progress") else gr.update(visible=False), outputs=resume_btn_ar)
+
+    # -------------------------------------------------------------
+    # Configuration Save Handlers
+    # -------------------------------------------------------------
+    def do_save(api_url, api_key, bot_token, channel_id, upload_tg, voice, gp, hk_d, hk_s, bg, out):
+        msg = save_config(api_url, api_key, bot_token, channel_id, upload_tg, voice, gp, hk_d, hk_s, bg, out)
+        return msg, msg
+
+    inputs_en = [
+        api_url_input_en, api_key_input_en, bot_token_input_en, channel_id_input_en, upload_telegram_checkbox_en, voice_input_en,
+        gameplay_path_input_en, hook_dir_input_en, hook_audio_input_en, bg_music_input_en, outro_path_input_en
+    ]
+    inputs_ar = [
+        api_url_input_ar, api_key_input_ar, bot_token_input_ar, channel_id_input_ar, upload_telegram_checkbox_ar, voice_input_ar,
+        gameplay_path_input_ar, hook_dir_input_ar, hook_audio_input_ar, bg_music_input_ar, outro_path_input_ar
     ]
 
-    save_assets_btn.click(fn=do_save, inputs=all_inputs, outputs=save_assets_status)
-    save_api_btn.click(fn=do_save, inputs=all_inputs, outputs=save_api_status)
+    save_assets_btn_en.click(fn=do_save, inputs=inputs_en, outputs=[save_assets_status_en, save_assets_status_ar])
+    save_assets_btn_ar.click(fn=do_save, inputs=inputs_ar, outputs=[save_assets_status_ar, save_assets_status_en])
+
+    save_api_btn_en.click(fn=do_save, inputs=inputs_en, outputs=[save_api_status_en, save_api_status_ar])
+    save_api_btn_ar.click(fn=do_save, inputs=inputs_ar, outputs=[save_api_status_ar, save_api_status_en])
 
 if __name__ == "__main__":
     import auth_guard

@@ -133,13 +133,16 @@ def build_package():
                 os.remove(os.path.join(root, file))
                 print(f"[REMOVED] Stray .py file: {file}")
 
-    # 4. Create synchronized AI_Shorts_Pro.zip archive
+    # 4. Create synchronized AI_Shorts_Pro.zip archive (Excluding large local model binaries to stay within GitHub's 100MB quota)
     print(f"\nCompressing package into {ZIP_TARGET}...")
     with zipfile.ZipFile(ZIP_TARGET, "w", zipfile.ZIP_DEFLATED) as zf:
         for root, dirs, files in os.walk(RELEASE_DIR):
             for file in files:
                 file_path = os.path.join(root, file)
                 arc_name = os.path.relpath(file_path, RELEASE_DIR)
+                # Keep zip under GitHub 100MB limit: kokoro model onnx resides in release folder and can be auto-downloaded if absent
+                if arc_name.startswith("kokoro_models"):
+                    continue
                 zf.write(file_path, arc_name)
     print(f"[OK] Distribution archive created: {ZIP_TARGET} ({os.path.getsize(ZIP_TARGET):,} bytes)")
                 
